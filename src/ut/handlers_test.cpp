@@ -120,6 +120,7 @@ public:
   static const std::string IMPU3_IMS_SUBSCRIPTION;
   static const std::string SCHEME_UNKNOWN;
   static const std::string SCHEME_DIGEST;
+  static const std::string SCHEME_DIGEST_MD5_A1;
   static const std::string SCHEME_AKA;
   static const std::string SIP_AUTHORIZATION;
   static const std::string HTTP_PATH_REG_TRUE;
@@ -1144,6 +1145,7 @@ const std::string HandlersTest::DEREG_BODY_PAIRINGS2 = "{\"registrations\":[{\"p
 const std::string HandlersTest::DEREG_BODY_LIST2 = "{\"registrations\":[{\"primary-impu\":\"" + IMPU + "\"},{\"primary-impu\":\"" + IMPU3 + "\"}]}";
 const std::string HandlersTest::SCHEME_UNKNOWN = "Unknwon";
 const std::string HandlersTest::SCHEME_DIGEST = "SIP Digest";
+const std::string HandlersTest::SCHEME_DIGEST_MD5_A1 = "Digest-MD5-A1";
 const std::string HandlersTest::SCHEME_AKA = "Digest-AKAv1-MD5";
 const std::string HandlersTest::SIP_AUTHORIZATION = "Authorization";
 const std::deque<std::string> HandlersTest::NO_CFS = {};
@@ -1961,6 +1963,76 @@ TEST_F(HandlersTest, AvNoPublicIDHSSAKA)
   encoded_aka.crypt_key = "63727970745f6b6579";
   encoded_aka.integrity_key = "696e746567726974795f6b6579";
   EXPECT_EQ(build_aka_json(encoded_aka), req.content());
+}
+
+TEST_F(HandlersTest, AvNonStandardAuthScheme)
+{
+  // This test tests an Impi Av task case with an HSS configured, and
+  // tests the behaviour when the "Digest-MD5-A1" scheme is returned.
+
+  // Start by building the HTTP request which will invoke an HSS
+  // lookup.
+  MockHttpStack::Request req(_httpstack,
+                             "/impi/" + IMPI,
+                             "av",
+                             "?impu=" + IMPU);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+  ImpiAvTask* task = new ImpiAvTask(req, &cfg, FAKE_TRAIL_ID);
+
+  // Once the task's run function is called, expect a diameter message to be sent.
+  EXPECT_CALL(*_mock_stack, send(_, _, 200))
+    .Times(1)
+    .WillOnce(WithArgs<0,1>(Invoke(store_msg_tsx)));
+  task->run();
+  ASSERT_FALSE(_caught_diam_tsx == NULL);
+
+  // Turn the caught Diameter msg structure into an MAR and check its contents.
+  Diameter::Message msg(_cx_dict, _caught_fd_msg, _mock_stack);
+  Cx::MultimediaAuthRequest mar(msg);
+  EXPECT_TRUE(mar.get_str_from_avp(_cx_dict->DESTINATION_REALM, test_str));
+  EXPECT_EQ(DEST_REALM, test_str);
+  EXPECT_TRUE(mar.get_str_from_avp(_cx_dict->DESTINATION_HOST, test_str));
+  EXPECT_EQ(DEST_HOST, test_str);
+  EXPECT_EQ(IMPI, mar.impi());
+  EXPECT_EQ(IMPU, mar.impu());
+  EXPECT_EQ(SCHEME_UNKNOWN, mar.sip_auth_scheme());
+  EXPECT_TRUE(mar.server_name(test_str));
+  EXPECT_EQ(DEFAULT_SERVER_NAME, test_str);
+
+  DigestAuthVector digest;
+  DigestAuthVector digest_md5a1;
+  AKAAuthVector aka;
+  digest_md5a1.ha1 = "secret";
+
+  // Build an MAA with an AKA scheme specified.
+  Cx::MultimediaAuthAnswer maa(_cx_dict,
+                               _mock_stack,
+                               DIAMETER_SUCCESS,
+                               SCHEME_DIGEST_MD5_A1,
+                               digest,
+                               aka,
+                               &digest_md5a1);
+
+  // Once it receives the MAA, check that the handler tries to add the public ID
+  // to the database and that a successful HTTP response is sent.
+  MockCache::MockPutAssociatedPublicID mock_op;
+  EXPECT_CALL(*_cache, create_PutAssociatedPublicID(IMPI, IMPU,  _, 300))
+    .WillOnce(Return(&mock_op));
+  _cache->EXPECT_DO_ASYNC(mock_op);
+
+  // Once it receives the MAA, check that a successful HTTP response is sent.
+  EXPECT_CALL(*_httpstack, send_reply(_, 200, _));
+  _caught_diam_tsx->on_response(maa);
+  _caught_fd_msg = NULL;
+  delete _caught_diam_tsx; _caught_diam_tsx = NULL;
+
+  // Build the expected response and check it's correct. We need to first
+  // encode the values we sent earlier into base64 or hex. This is hardcoded.
+  DigestAuthVector expected_resp;
+  expected_resp.ha1 = "secret";
+  expected_resp.realm = "IMS0.MNX.NET";
+  expected_resp.qop = "auth";
+  EXPECT_EQ(build_av_json(expected_resp), req.content());
 }
 
 TEST_F(HandlersTest, AuthInvalidScheme)
