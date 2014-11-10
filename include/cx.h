@@ -230,11 +230,13 @@ public:
                        const int32_t& result_code,
                        const std::string& scheme,
                        const DigestAuthVector& digest_av,
-                       const AKAAuthVector& aka_av);
+                       const AKAAuthVector& aka_av,
+                       const DigestAuthVector* digest_av_2 = NULL);
   inline MultimediaAuthAnswer(Diameter::Message& msg) : Diameter::Message(msg) {};
 
   std::string sip_auth_scheme() const;
   DigestAuthVector digest_auth_vector() const;
+  DigestAuthVector digest_md5a1_auth_vector() const;
   AKAAuthVector aka_auth_vector() const;
 
 private:

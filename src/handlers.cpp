@@ -280,9 +280,17 @@ void ImpiTask::on_mar_response(Diameter::Message& rsp)
     case 2001:
     {
       std::string sip_auth_scheme = maa.sip_auth_scheme();
-      if (sip_auth_scheme == _cfg->scheme_digest)
+      if ((sip_auth_scheme == _cfg->scheme_digest) || (sip_auth_scheme == "Digest-MD5-A1"))
       {
-        send_reply(maa.digest_auth_vector());
+        if (sip_auth_scheme == _cfg->scheme_digest)
+        {
+          send_reply(maa.digest_auth_vector());
+        }
+        else if (sip_auth_scheme == "Digest-MD5-A1")
+        {
+          send_reply(maa.digest_md5a1_auth_vector());
+        }
+
         if (_cfg->impu_cache_ttl != 0)
         {
           LOG_DEBUG("Caching that private ID %s includes public ID %s",

@@ -424,7 +424,8 @@ MultimediaAuthAnswer::MultimediaAuthAnswer(const Dictionary* dict,
                                            const int32_t& result_code,
                                            const std::string& scheme,
                                            const DigestAuthVector& digest_av,
-                                           const AKAAuthVector& aka_av) :
+                                           const AKAAuthVector& aka_av,
+                                           const DigestAuthVector* digest_2_av) :
                                            Diameter::Message(dict, dict->MULTIMEDIA_AUTH_ANSWER, stack)
 {
   LOG_DEBUG("Building Multimedia-Authorization answer");
@@ -434,15 +435,24 @@ MultimediaAuthAnswer::MultimediaAuthAnswer(const Dictionary* dict,
   add(Diameter::AVP(dict->RESULT_CODE).val_i32(result_code));
   Diameter::AVP sip_auth_data_item(dict->SIP_AUTH_DATA_ITEM);
   sip_auth_data_item.add(Diameter::AVP(dict->SIP_AUTH_SCHEME).val_str(scheme));
-  Diameter::AVP sip_digest_authenticate(dict->SIP_DIGEST_AUTHENTICATE);
-  sip_digest_authenticate.add(Diameter::AVP(dict->CX_DIGEST_HA1).val_str(digest_av.ha1));
-  sip_digest_authenticate.add(Diameter::AVP(dict->CX_DIGEST_REALM).val_str(digest_av.realm));
-  sip_digest_authenticate.add(Diameter::AVP(dict->CX_DIGEST_QOP).val_str(digest_av.qop));
-  sip_auth_data_item.add(sip_digest_authenticate);
-  sip_auth_data_item.add(Diameter::AVP(dict->SIP_AUTHENTICATE).val_str(aka_av.challenge));
-  sip_auth_data_item.add(Diameter::AVP(dict->SIP_AUTHORIZATION).val_str(aka_av.response));
-  sip_auth_data_item.add(Diameter::AVP(dict->CONFIDENTIALITY_KEY).val_str(aka_av.crypt_key));
-  sip_auth_data_item.add(Diameter::AVP(dict->INTEGRITY_KEY).val_str(aka_av.integrity_key));
+  if (digest_2_av == NULL)
+  {
+    Diameter::AVP sip_digest_authenticate(dict->SIP_DIGEST_AUTHENTICATE);
+    sip_digest_authenticate.add(Diameter::AVP(dict->CX_DIGEST_HA1).val_str(digest_av.ha1));
+    sip_digest_authenticate.add(Diameter::AVP(dict->CX_DIGEST_REALM).val_str(digest_av.realm));
+    sip_digest_authenticate.add(Diameter::AVP(dict->CX_DIGEST_QOP).val_str(digest_av.qop));
+    sip_auth_data_item.add(sip_digest_authenticate);
+    sip_auth_data_item.add(Diameter::AVP(dict->SIP_AUTHENTICATE).val_str(aka_av.challenge));
+    sip_auth_data_item.add(Diameter::AVP(dict->SIP_AUTHORIZATION).val_str(aka_av.response));
+    sip_auth_data_item.add(Diameter::AVP(dict->CONFIDENTIALITY_KEY).val_str(aka_av.crypt_key));
+    sip_auth_data_item.add(Diameter::AVP(dict->INTEGRITY_KEY).val_str(aka_av.integrity_key));
+  }
+  else
+  {
+    sip_auth_data_item.add(Diameter::AVP(dict->SIP_AUTHENTICATE).val_str(digest_2_av->ha1));
+    sip_auth_data_item.add(Diameter::AVP(dict->SIP_AUTHORIZATION).val_str("0"));
+    sip_auth_data_item.add(Diameter::AVP(dict->INTEGRITY_KEY).val_str("0"));
+  }
   add(sip_auth_data_item);
 }
 
@@ -523,6 +533,27 @@ DigestAuthVector MultimediaAuthAnswer::digest_auth_vector() const
           LOG_DEBUG("Found (non-3GPP) Digest-QoP %s", digest_auth_vector.qop.c_str());
         }
       }
+    }
+  }
+  return digest_auth_vector;
+}
+
+DigestAuthVector MultimediaAuthAnswer::digest_md5a1_auth_vector() const
+{
+  LOG_DEBUG("Getting Digest-MD5-A1 authentication vector from Multimedia-Auth answer");
+  DigestAuthVector digest_auth_vector;
+  Diameter::AVP::iterator avps = begin(((Cx::Dictionary*)dict())->SIP_AUTH_DATA_ITEM);
+  if (avps != end())
+  {
+    Diameter::AVP::iterator avps2 = avps->begin(((Cx::Dictionary*)dict())->SIP_AUTHENTICATE);
+    if (avps2 != avps->end())
+    {
+      digest_auth_vector.ha1 = avps2->val_str();
+      LOG_DEBUG("Found Digest-HA1 %s", digest_auth_vector.ha1.c_str());
+      digest_auth_vector.realm = "IMS0.MNX.NET";
+      LOG_DEBUG("Found Digest-Realm %s", digest_auth_vector.realm.c_str());
+      digest_auth_vector.qop = "auth";
+      LOG_DEBUG("Found Digest-QoP %s", digest_auth_vector.qop.c_str());
     }
   }
   return digest_auth_vector;
