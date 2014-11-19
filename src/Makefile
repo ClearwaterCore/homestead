@@ -32,6 +32,7 @@ TARGET_SOURCES := accesslogger.cpp \
                   log.cpp \
                   realmmanager.cpp \
                   saslogger.cpp \
+                  signalnames.cpp \
                   sproutconnection.cpp \
                   statistic.cpp \
                   statisticsmanager.cpp \
@@ -121,7 +122,8 @@ LDFLAGS += -lthrift \
            -lboost_regex \
            -lboost_date_time \
            -lpthread \
-           -lcurl
+           -lcurl \
+           -lc
 
 # Only use the real SAS library in the production build.
 LDFLAGS_BUILD += -lsas
