@@ -53,7 +53,7 @@ static const PDLog CL_HOMESTEAD_INVALID_SAS_OPTION
 (
   PDLogBase::CL_HOMESTEAD_ID + 1,
   PDLOG_ERR,
-  "The sas_server option in /etc/clearwater/config is invalid or not configured",
+  "The sas_server option in /etc/clearwater/config is invalid or not configured.",
   "The interface to the SAS is not specified.",
   "No call traces will appear in the sas",
   "Set the fully qualified SAS hostname for the sas_server=<hostname>.<zone> option. "
@@ -120,7 +120,7 @@ static const PDLog2<const char*, int> CL_HOMESTEAD_HTTP_INIT_FAIL
 (
   PDLogBase::CL_HOMESTEAD_ID + 8,
   PDLOG_ERR,
-  "Fatal - Failed to initialize HttpStack stack in function %s with error %d",
+  "Fatal - Failed to initialize HttpStack stack in function %s with error %d.",
   "The HTTP interfaces could not be initialized.",
   "Call processing will not work.",
   "(1). Check the configuration with the Installation guide for correctness. "
@@ -132,7 +132,7 @@ static const PDLog CL_HOMESTEAD_ENDED
 (
   PDLogBase::CL_HOMESTEAD_ID + 9,
   PDLOG_ERR,
-  "Fatal - Termination signal received - terminating",
+  "Fatal - Termination signal received - terminating.",
   "Homestead could have been stopped or Homestead could have been restarted by monit due to a timeout.",
   "Homestead will exit.",
   "(1). For a command initiated stop the monit log will indicate a stop on user request "
@@ -144,7 +144,7 @@ static const PDLog2<const char*, int> CL_HOMESTEAD_HTTP_STOP_FAIL
 (
   PDLogBase::CL_HOMESTEAD_ID + 10,
   PDLOG_ERR,
-  "The HTTP interfaces encountered an error when stopping the HTTP stack in %s with error %d",
+  "The HTTP interfaces encountered an error when stopping the HTTP stack in %s with error %d.",
   "When Homestead was exiting it encountered an error when shutting down the HTTP stack.",
   "Not critical as Homestead is exiting anyway.",
   "Report this issue to support."
@@ -154,7 +154,7 @@ static const PDLog2<const char*, int> CL_HOMESTEAD_DIAMETER_STOP_FAIL
 (
   PDLogBase::CL_HOMESTEAD_ID + 11,
   PDLOG_ERR,
-  "Failed to stop Diameter stack in function %s with error %d",
+  "Failed to stop Diameter stack in function %s with error %d.",
   "The Diameter interface encountered an error when shutting down the Diameter interface.",
   "Not critical as Homestead is exiting anyway.",
   "Report this issue to support."
