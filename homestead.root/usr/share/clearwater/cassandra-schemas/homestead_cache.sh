@@ -91,15 +91,16 @@ if [[ ! -e /var/lib/cassandra/data/${keyspace} ]]; then
 	    done
 	    printf " };\n"
 	) > /tmp/$$.cqlsh.in
+	$namespace_prefix cqlsh -3 < /tmp/$$.cqlsh.in
     else
 	let "num_replicas=${#cassandra_nodes[@]}"
 	if [ $num_replicas -gt $max_replicas ]; then
 	    let "num_replicas=$max_replicas"
 	fi
 	printf "CREATE KEYSPACE ${keyspace} WITH strategy_class = 'SimpleStrategy' AND strategy_options:replication_factor = 2;" > /tmp/$$.cqlsh.in
+	$namespace_prefix cqlsh -2 < /tmp/$$.cqlsh.in
     fi
 
-    $namespace_prefix cqlsh -3 < /tmp/$$.cqlsh.in
     rm -f /tmp/$$.cqlsh.in
 
     echo "USE ${keyspace};
