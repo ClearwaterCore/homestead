@@ -64,7 +64,7 @@ struct options
   std::string local_host;
   std::string home_domain;
   std::string diameter_conf;
-  std::string dns_server;
+  std::vector<std::string> dns_servers;
   std::string http_address;
   unsigned short http_port;
   int http_threads;
@@ -174,6 +174,8 @@ void usage(void)
        "                            specified SAS is disabled\n"
        "     --diameter-timeout-ms  Length of time (in ms) before timing out a Diameter request to the HSS\n"
        "     --alarms-enabled       Whether SNMP alarms are enabled (default: false)\n"
+       "     --dns-server <server>[,<server2>,<server3>]\n"
+       "                            IP addresses of the DNS servers to use (defaults to 127.0.0.1)\n"
        " -F, --log-file <directory>\n"
        "                            Log to file in specified directory\n"
        " -L, --log-level N          Set log level to N (default: 4)\n"
@@ -349,8 +351,10 @@ int init_options(int argc, char**argv, struct options& options)
       break;
 
     case DNS_SERVER:
-      LOG_INFO("DNS server set to: %s", optarg);
-      options.dns_server = std::string(optarg);
+      options.dns_servers.clear();
+      Utils::split_string(std::string(optarg), ',', options.dns_servers, 0, false);
+      LOG_INFO("%d DNS servers passed on the command line",
+               options.dns_servers.size());
       break;
 
     case 'F':
@@ -416,7 +420,7 @@ int main(int argc, char**argv)
   options.local_host = "127.0.0.1";
   options.home_domain = "dest-realm.unknown";
   options.diameter_conf = "homestead.conf";
-  options.dns_server = "127.0.0.1";
+  options.dns_servers.push_back("127.0.0.1");
   options.http_address = "0.0.0.0";
   options.http_port = 8888;
   options.http_threads = 1;
@@ -527,7 +531,7 @@ int main(int argc, char**argv)
                                               20,                        // Maximum token bucket size.
                                               10.0,                      // Initial token fill rate (per sec).
                                               10.0);                     // Minimum token fill rate (per sec).
-  DnsCachedResolver* dns_resolver = new DnsCachedResolver(options.dns_server);
+  DnsCachedResolver* dns_resolver = new DnsCachedResolver(options.dns_servers);
   HttpResolver* http_resolver = new HttpResolver(dns_resolver, af);
 
   Cache* cache = Cache::get_instance();
