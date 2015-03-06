@@ -83,7 +83,7 @@ get_settings()
         # Set up defaults and then pull in any overrides.
         sas_server=0.0.0.0
         hss_hostname=0.0.0.0
-        dns_server=127.0.0.1
+        signaling_dns_server=127.0.0.1
         scscf=5054
         target_latency_us=100000
 
@@ -159,7 +159,7 @@ do_start()
                      --home-domain=$home_domain
                      --diameter-conf=/var/lib/homestead/homestead.conf
                      --target-latency-us=$target_latency_us
-                     --dns-server=$dns_server
+                     --dns-server=$signaling_dns_server
                      --http=$local_ip
                      --http-threads=$num_http_threads
                      $dest_realm
