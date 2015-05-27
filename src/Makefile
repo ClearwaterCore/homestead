@@ -129,6 +129,7 @@ LDFLAGS += -lthrift \
            -lcurl \
            -lc \
            -lboost_filesystem
+           -lz
 
 # Only use the real SAS library in the production build.
 LDFLAGS_BUILD += -lsas
