@@ -15,6 +15,8 @@ if [ $? -ne 0 ]; then
     exit 1
  fi
 
+if [[ ! -e /var/lib/cassandra/data/homestead_cache ]];
+then
   echo "CREATE KEYSPACE homestead_cache WITH REPLICATION =  {'class': 'SimpleStrategy', 'replication_factor': 2};
         USE homestead_cache;
         CREATE TABLE impi (private_id text PRIMARY KEY, digest_ha1 text, digest_realm text, digest_qop text, known_preferred boolean) WITH COMPACT STORAGE AND read_repair_chance = 1.0;
