@@ -128,16 +128,17 @@ LDFLAGS += -lthrift \
            -lpthread \
            -lcurl \
            -lc \
-           -lboost_filesystem
+           -lboost_filesystem \
+           -lz
 
 # Only use the real SAS library in the production build.
-LDFLAGS_BUILD += -lsas
+LDFLAGS_BUILD += -lsas -lz
 
 # Test build uses just-built libraries, which may not be installed
 LDFLAGS_TEST += -Wl,-rpath=$(ROOT)/usr/lib
 
 # Test build also uses libcurl (to verify HttpStack operation)
-LDFLAGS_TEST += -lcurl
+LDFLAGS_TEST += -lcurl -ldl
 
 # Now the GMock / GTest boilerplate.
 GTEST_HEADERS := $(GTEST_DIR)/include/gtest/*.h \
