@@ -628,7 +628,14 @@ void ImpuLocationInfoTask::run()
   std::string path = _req.path();
   _impu = path.substr(prefix.length(), path.find_first_of("/", prefix.length()) - prefix.length());
 
-  if (_cfg->hss_configured)
+  if (_impu.find("tel:") != std::string::npos)
+  {
+    LOG_INFO("Automatically treating tel: URI as not found");
+    send_http_reply(HTTP_NOT_FOUND);
+    delete this;
+    return;
+  }
+  else if (_cfg->hss_configured)
   {
     _originating = _req.param("originating");
     _authorization_type = _req.param("auth-type");
