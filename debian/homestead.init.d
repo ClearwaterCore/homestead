@@ -169,6 +169,8 @@ get_daemon_args()
           alarms_enabled_arg="--alarms-enabled"
         fi
 
+        [ "$sas_compression_enabled" != "Y" ] || sas_compression_enabled_arg="--sas-compression-enabled"
+
         DAEMON_ARGS="--localhost=$local_ip
                      --home-domain=$home_domain
                      --diameter-conf=/var/lib/homestead/homestead.conf
@@ -193,7 +195,9 @@ get_daemon_args()
                      --access-log=$log_directory
                      --log-file=$log_directory
                      --log-level=$log_level
-                     --sas=$sas_server,$NAME@$public_hostname"
+                     --sas=$sas_server,$NAME@$public_hostname
+                     $sas_compression_enabled_arg"
+
 
         [ "$http_blacklist_duration" = "" ]     || DAEMON_ARGS="$DAEMON_ARGS --http-blacklist-duration=$http_blacklist_duration"
         [ "$diameter_blacklist_duration" = "" ] || DAEMON_ARGS="$DAEMON_ARGS --diameter-blacklist-duration=$diameter_blacklist_duration"
