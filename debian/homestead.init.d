@@ -102,6 +102,7 @@ get_settings()
         impu_cache_ttl=0
         hss_reregistration_time=1800
         max_peers=2
+	sas_compression_disabled=Y
         . /etc/clearwater/config
 
         log_level=2
