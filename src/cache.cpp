@@ -352,7 +352,7 @@ bool Cache::GetRegData::perform(CassandraStore::ClientInterface* client,
 
   try
   {
-    ha_get_all_columns(client, IMPU, _public_id, results);
+    ha_get_all_columns(client, IMPU, _public_id, results, trail);
 
     for(std::vector<ColumnOrSuperColumn>::iterator it = results.begin(); it != results.end(); ++it)
     {
@@ -541,7 +541,8 @@ bool Cache::GetAssociatedPublicIDs::perform(CassandraStore::ClientInterface* cli
                                     IMPI,
                                     _private_ids,
                                     ASSOC_PUBLIC_ID_COLUMN_PREFIX,
-                                    columns);
+                                    columns,
+                                    trail);
   }
   catch(CassandraStore::RowNotFoundException& rnfe)
   {
@@ -608,7 +609,8 @@ bool Cache::GetAssociatedPrimaryPublicIDs::perform(CassandraStore::ClientInterfa
                                     IMPI_MAPPING,
                                     _private_ids,
                                     IMPI_MAPPING_PREFIX,
-                                    columns);
+                                    columns,
+                                    trail);
   }
   catch(CassandraStore::RowNotFoundException& rnfe)
   {
@@ -695,7 +697,7 @@ bool Cache::GetAuthVector::perform(CassandraStore::ClientInterface* client,
 
   LOG_DEBUG("Issuing cache query");
   std::vector<ColumnOrSuperColumn> results;
-  ha_get_columns(client, IMPI, _private_id, requested_columns, results);
+  ha_get_columns(client, IMPI, _private_id, requested_columns, results, trail);
 
   for (std::vector<ColumnOrSuperColumn>::const_iterator it = results.begin();
        it != results.end();
@@ -942,7 +944,8 @@ bool Cache::DissociateImplicitRegistrationSetFromImpi::perform(CassandraStore::C
                              IMPU,
                              primary_public_id,
                              IMPI_COLUMN_PREFIX,
-                             columns);
+                             columns,
+                             trail);
   LOG_DEBUG("%d IMPIs are associated with this IRS", columns.size());
 
   std::set<std::string> associated_impis_set;
