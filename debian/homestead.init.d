@@ -153,7 +153,9 @@ get_daemon_args()
           diameter_timeout_ms=$(( ($target_latency_us + 499)/500 ))
         fi
 
-        [ "$hss_mar_lowercase_unknown" != "Y" ] || scheme_unknown_arg="--scheme-unknown=unknown"
+        [ "$hss_mar_lowercase_unknown" != "Y" ] || scheme_args="--scheme-unknown=unknown"
+        [ "$hss_mar_force_digest" != "Y" ] || scheme_args="--scheme-unknown=\"SIP Digest\" --scheme-aka=\"SIP Digest\""
+        [ "$hss_mar_force_aka" != "Y" ] || scheme_args="--scheme-unknown=Digest-AKAv1-MD5 --scheme-digest=Digest-AKAv1-MD5"
 
         [ -z "$diameter_timeout_ms" ] || diameter_timeout_ms_arg="--diameter-timeout-ms=$diameter_timeout_ms"
         [ -z "$signaling_namespace" ] || namespace_prefix="ip netns exec $signaling_namespace"
@@ -179,12 +181,13 @@ get_daemon_args()
                      --http-threads=$num_http_threads
                      $dest_realm
                      --dest-host=$hss_hostname
+                     --hss-peer=$force_hss_peer
                      --max-peers=$max_peers
                      --server-name=$server_name
                      --impu-cache-ttl=$impu_cache_ttl
                      --hss-reregistration-time=$hss_reregistration_time
                      --sprout-http-name=$sprout_http_name
-                     $scheme_unknown_arg
+                     $scheme_args
                      $diameter_timeout_ms_arg
                      $alarms_enabled_arg
                      $target_latency_us_arg
@@ -218,7 +221,7 @@ do_start()
         # daemon is not running, so attempt to start it.
         setup_environment
         get_daemon_args
-        $namespace_prefix start-stop-daemon --start --quiet --background --make-pidfile --pidfile $PIDFILE --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS \
+        eval $namespace_prefix start-stop-daemon --start --quiet --background --make-pidfile --pidfile $PIDFILE --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS \
                 || return 2
         # Add code here, if necessary, that waits for the process to be ready
         # to handle requests from services started subsequently which depend
@@ -258,7 +261,7 @@ do_run()
 {
         setup_environment
         get_daemon_args
-        $namespace_prefix start-stop-daemon --start --quiet --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS \
+        eval $namespace_prefix start-stop-daemon --start --quiet --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS \
                 || return 2
 }
 
