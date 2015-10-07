@@ -104,6 +104,13 @@ get_settings()
         max_peers=2
         . /etc/clearwater/config
 
+	# Log the output of clearwater-show-config to syslog
+	(
+	    clearwater-show-config > /tmp/$$ 2>&1
+	    logger -t "clearwater-show-config" -f /tmp/$$ -p local6.info
+	    rm -f /tmp/$$
+	)
+
         log_level=2
         num_http_threads=$(($(grep processor /proc/cpuinfo | wc -l) * 50))
 
