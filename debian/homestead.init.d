@@ -190,7 +190,7 @@ get_daemon_args()
                      --dest-host=$hss_hostname
                      --hss-peer=$force_hss_peer
                      --max-peers=$max_peers
-                     --server-name=$server_name
+                     --server-name=\"$server_name\"
                      --impu-cache-ttl=$impu_cache_ttl
                      --hss-reregistration-time=$hss_reregistration_time
                      --sprout-http-name=$sprout_http_name
