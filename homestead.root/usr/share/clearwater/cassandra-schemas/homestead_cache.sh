@@ -1,4 +1,5 @@
-#! /bin/bash
+#!/bin/bash
+. /etc/clearwater/config
 
 . /etc/clearwater/config
 if [ ! -z $signaling_namespace ]
@@ -61,3 +62,12 @@ then
   echo "USE homestead_cache;
         CREATE TABLE impi_mapping (private_id text PRIMARY KEY, unused text) WITH COMPACT STORAGE AND read_repair_chance = 1.0;" | $namespace_prefix cqlsh
 fi
+
+if [ -z "$speculative_retry_value" ]
+then
+  speculative_retry_value="50ms"
+fi
+
+echo "USE homestead_cache;
+      ALTER TABLE impu WITH speculative_retry = '$speculative_retry_value';
+      ALTER TABLE impi WITH speculative_retry = '$speculative_retry_value';" | /usr/share/clearwater/bin/run-in-signaling-namespace cqlsh
