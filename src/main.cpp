@@ -840,7 +840,7 @@ int main(int argc, char**argv)
     else
     {
       realm_manager = new RealmManager(diameter_stack,
-                                       "",
+                                       options.dest_realm,
                                        options.force_hss_peer,
                                        options.max_peers,
                                        diameter_resolver);
