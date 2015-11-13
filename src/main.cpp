@@ -502,6 +502,13 @@ void signal_handler(int sig)
   CL_HOMESTEAD_CRASH.log(strsignal(sig));
   closelog();
 
+  // Dump out the RAM trace buffer
+  char ramname[64];
+  sprintf(ramname, "/var/log/homestead/ramtrace.%ld.txt", time(NULL));
+  FILE *ramtrace = fopen(ramname, "w");
+  Log::ramDecode(ramtrace);
+  fclose(ramtrace);
+
   // Dump a core.
   abort();
 }
@@ -642,7 +649,7 @@ int main(int argc, char**argv)
                                                                          ".1.2.826.0.1.1578918.9.5.15");
   // Must happen after all SNMP tables have been registered.
   init_snmp_handler_threads("homestead");
-  
+
   configure_cx_results_tables(mar_results_table,
                              sar_results_table,
                              uar_results_table,
@@ -731,8 +738,8 @@ int main(int argc, char**argv)
   try
   {
     diameter_stack->initialize();
-    diameter_stack->configure(options.diameter_conf, 
-                              exception_handler, 
+    diameter_stack->configure(options.diameter_conf,
+                              exception_handler,
                               hss_comm_monitor,
                               realm_counter,
                               host_counter);
@@ -830,7 +837,7 @@ int main(int argc, char**argv)
 
   DiameterResolver* diameter_resolver = NULL;
   RealmManager* realm_manager = NULL;
-  
+
   if (hss_configured)
   {
     diameter_resolver = new DiameterResolver(dns_resolver,
