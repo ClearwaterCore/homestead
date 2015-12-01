@@ -124,7 +124,8 @@ enum OptionTypes
   HTTP_BLACKLIST_DURATION,
   DIAMETER_BLACKLIST_DURATION,
   FORCE_HSS_PEER,
-  PIDFILE
+  PIDFILE,
+  OPT_SAS_COMPRESSION_ENABLED
 };
 
 const static struct option long_opt[] =
@@ -380,6 +381,11 @@ int init_options(int argc, char**argv, struct options& options)
       options.diameter_timeout_ms = atoi(optarg);
       break;
 
+      break;
+
+    case OPT_SAS_COMPRESSION_ENABLED:
+      SAS::compression_enabled = true;
+      TRC_INFO("SAS compression enabled");
     case DNS_SERVER:
       options.dns_servers.clear();
       Utils::split_string(std::string(optarg), ',', options.dns_servers, 0, false);
