@@ -98,18 +98,30 @@ get_settings()
         hss_hostname=0.0.0.0
         signaling_dns_server=127.0.0.1
         scscf=5054
-
         impu_cache_ttl=0
-        hss_reregistration_time=1800
         max_peers=2
+        reg_max_expires=300
         . /etc/clearwater/config
 
-	# Log the output of clearwater-show-config to syslog
-	(
-	    clearwater-show-config > /tmp/$$ 2>&1
-	    logger -t "clearwater-show-config" -f /tmp/$$ -p local6.info
-	    rm -f /tmp/$$
-	)
+        if [ -z $hss_reregistration_time ]
+        then
+          # Default hss_reregistration_time to max(1800, $reg_max_expires/2), so
+          # that homestead only discards expired registration data when sprout
+          # does (at the earliest).
+          hss_reregistration_time=$(( $reg_max_expires / 2 ))
+
+          if [ $hss_reregistration_time -lt 1800 ]
+          then
+            hss_reregistration_time=1800
+          fi
+        fi
+
+  # Log the output of clearwater-show-config to syslog
+  (
+      clearwater-show-config > /tmp/$$ 2>&1
+      logger -t "clearwater-show-config" -f /tmp/$$ -p local6.info
+      rm -f /tmp/$$
+  )
 
         log_level=2
         num_http_threads=$(($(grep processor /proc/cpuinfo | wc -l) * 50))
