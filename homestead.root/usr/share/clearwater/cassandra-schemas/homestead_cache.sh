@@ -1,6 +1,10 @@
 #! /bin/bash
+
+. /usr/share/clearwater/cassandra-schemas/schema_utils.sh
+
+quit_if_no_cassandra
+
 . /etc/clearwater/config
-. /usr/share/clearwater/cassandra-schemas/replication_string.sh
 
 if [[ ! -e /var/lib/cassandra/data/homestead_cache ]];
 then
