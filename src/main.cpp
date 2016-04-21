@@ -205,7 +205,7 @@ void usage(void)
        "     --target-latency-us <usecs>\n"
        "                            Target latency above which throttling applies (default: 100000)\n"
        "     --max-tokens N         Maximum number of tokens allowed in the token bucket (used by\n"
-       "                            the throttling code (default: 20))\n"
+       "                            the throttling code (default: 100))\n"
        "     --init-token-rate N    Initial token refill rate of tokens in the token bucket (used by\n"
        "                            the throttling code (default: 100.0))\n"
        "     --min-token-rate N     Minimum token refill rate of tokens in the token bucket (used by\n"
@@ -537,7 +537,7 @@ int main(int argc, char**argv)
   options.sas_system_name = "";
   options.diameter_timeout_ms = 200;
   options.target_latency_us = 100000;
-  options.max_tokens = 20;
+  options.max_tokens = 100;
   options.init_token_rate = 100.0;
   options.min_token_rate = 10.0;
   options.exception_max_ttl = 600;
@@ -869,6 +869,14 @@ int main(int argc, char**argv)
   cache->stop();
   cache->wait_stopped();
 
+  if (hss_configured)
+  {
+    realm_manager->stop();
+    delete realm_manager; realm_manager = NULL;
+    delete diameter_resolver; diameter_resolver = NULL;
+    delete dns_resolver; dns_resolver = NULL;
+  }
+
   try
   {
     diameter_stack->stop();
@@ -886,14 +894,6 @@ int main(int argc, char**argv)
   delete rtr_task; rtr_task = NULL;
 
   delete sprout_conn; sprout_conn = NULL;
-
-  if (hss_configured)
-  {
-    realm_manager->stop();
-    delete realm_manager; realm_manager = NULL;
-    delete diameter_resolver; diameter_resolver = NULL;
-    delete dns_resolver; dns_resolver = NULL;
-  }
 
   delete realm_counter; realm_counter = NULL;
   delete host_counter; host_counter = NULL;
