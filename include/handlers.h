@@ -514,6 +514,16 @@ protected:
   std::string _provided_server_name;
 };
 
+class ImpuReadRegDataTask : public ImpuRegDataTask
+{
+public:
+  // Just use the superclass's constructor.
+  using ImpuRegDataTask::ImpuRegDataTask;
+
+  virtual ~ImpuReadRegDataTask() {}
+  virtual void run();
+};
+
 class ImpuIMSSubscriptionTask : public ImpuRegDataTask
 {
 public:
