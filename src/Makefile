@@ -8,6 +8,7 @@ COMMON_SOURCES := accesslogger.cpp \
                   baseresolver.cpp \
                   base64.cpp \
                   cache.cpp \
+                  cassandra_connection_pool.cpp \
                   cassandra_store.cpp \
                   communicationmonitor.cpp \
                   counter.cpp \
@@ -19,17 +20,18 @@ COMMON_SOURCES := accesslogger.cpp \
                   exception_handler.cpp \
                   handlers.cpp \
                   health_checker.cpp \
+                  http_connection_pool.cpp \
+                  httpclient.cpp \
                   httpconnection.cpp \
-                  httpresolver.cpp \
+                  a_record_resolver.cpp \
                   httpstack.cpp \
                   httpstack_utils.cpp \
                   load_monitor.cpp \
                   logger.cpp \
                   log.cpp \
-                  pdlog.cpp \
+                  namespace_hop.cpp \
                   realmmanager.cpp \
                   saslogger.cpp \
-                  namespace_hop.cpp \
                   sproutconnection.cpp \
                   statistic.cpp \
                   statisticsmanager.cpp \
@@ -57,7 +59,8 @@ homestead_test_SOURCES := ${COMMON_SOURCES} \
                           fakesnmp.cpp \
                           mockfreediameter.cpp \
                           mock_sas.cpp \
-                          chargingaddresses_test.cpp
+                          chargingaddresses_test.cpp \
+                          pthread_cond_var_helper.cpp
 
 COMMON_CPPFLAGS := -I../include \
                    -I../usr/include \

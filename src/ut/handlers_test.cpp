@@ -127,6 +127,7 @@ public:
   static const std::string SCHEME_UNKNOWN;
   static const std::string SCHEME_DIGEST;
   static const std::string SCHEME_AKA;
+  static const std::string SCHEME_AKAV2;
   static const std::string SIP_AUTHORIZATION;
   static const std::string HTTP_PATH_REG_TRUE;
   static const std::string HTTP_PATH_REG_FALSE;
@@ -312,6 +313,8 @@ public:
         writer.String(av.crypt_key.c_str());
         writer.String(JSON_INTEGRITYKEY.c_str());
         writer.String(av.integrity_key.c_str());
+        writer.String(JSON_VERSION.c_str());
+        writer.Int(av.version);
       }
       writer.EndObject();
     }
@@ -429,11 +432,16 @@ public:
                          std::string expected_result = REGDATA_RESULT,
                          RegistrationState expected_new_state = RegistrationState::REGISTERED,
                          bool expect_deletion = false,
-                         CassandraStore::ResultCode cache_error = CassandraStore::OK)
+                         CassandraStore::ResultCode cache_error = CassandraStore::OK,
+                         int hss_reregistration_timeout = 3600,
+                         int reg_max_expires = 300,
+                         int record_ttl = 7200)
   {
     // Configure the task to use a HSS, and send a RE_REGISTRATION
     // SAR to the HSS every hour.
-    ImpuRegDataTask::Config cfg(true, 3600);
+    ImpuRegDataTask::Config cfg(true,
+                                hss_reregistration_timeout,
+                                record_ttl);
     ImpuRegDataTask* task = new ImpuRegDataTask(req, &cfg, FAKE_TRAIL_ID);
 
     // Once the request is processed by the task, we expect it to
@@ -470,7 +478,7 @@ public:
     MockCache::MockPutAssociatedPrivateID mock_op2;
     if (new_binding)
     {
-      EXPECT_CALL(*_cache, create_PutAssociatedPrivateID(IMPU_REG_SET, IMPI, _, 7200))
+      EXPECT_CALL(*_cache, create_PutAssociatedPrivateID(IMPU_REG_SET, IMPI, _, record_ttl))
         .WillOnce(Return(&mock_op2));
       EXPECT_DO_ASYNC(*_cache, mock_op2);
     }
@@ -507,6 +515,8 @@ public:
     Cx::ServerAssignmentAnswer saa(_cx_dict,
                                    _mock_stack,
                                    DIAMETER_SUCCESS,
+                                   0,
+                                   0,
                                    IMPU_IMS_SUBSCRIPTION,
                                    NO_CHARGING_ADDRESSES);
     if (!expect_deletion)
@@ -519,11 +529,12 @@ public:
       // Once we simulate the Diameter response, check that the
       // database is updated.
       MockCache::MockPutRegData mock_op3;
-      EXPECT_CALL(*_cache, create_PutRegData(IMPU_REG_SET, _, 7200))
+      EXPECT_CALL(*_cache, create_PutRegData(IMPU_REG_SET, _, record_ttl))
         .WillOnce(Return(&mock_op3));
       EXPECT_CALL(mock_op3, with_xml(IMPU_IMS_SUBSCRIPTION))
         .WillOnce(ReturnRef(mock_op3));
-      if (expected_new_state != RegistrationState::UNCHANGED)
+      if ((expected_new_state != RegistrationState::UNCHANGED) &&
+          (expected_new_state != RegistrationState::UNREGISTERED))
       {
         EXPECT_CALL(mock_op3, with_reg_state(expected_new_state))
           .WillOnce(ReturnRef(mock_op3));
@@ -605,8 +616,10 @@ public:
   void reg_data_template_no_sar(std::string request_type,
                                 bool use_impi,
                                 RegistrationState db_regstate,
-                                int db_ttl = 3600,
-                                std::string expected_result = REGDATA_RESULT)
+                                int db_ttl = 7200,
+                                std::string expected_result = REGDATA_RESULT,
+                                int hss_reregistration_timeout = 3600,
+                                int record_ttl = 7200)
   {
     MockHttpStack::Request req(_httpstack,
                                "/impu/" + IMPU + "/reg-data",
@@ -617,7 +630,9 @@ public:
 
     // Configure the task to use a HSS, and send a RE_REGISTRATION
     // SAR to the HSS every hour.
-    ImpuRegDataTask::Config cfg(true, 3600);
+    ImpuRegDataTask::Config cfg(true,
+                                hss_reregistration_timeout,
+                                record_ttl);
     ImpuRegDataTask* task = new ImpuRegDataTask(req, &cfg, FAKE_TRAIL_ID);
 
     // Once the request is processed by the task, we expect it to
@@ -718,6 +733,8 @@ public:
       Cx::ServerAssignmentAnswer saa(_cx_dict,
                                      _mock_stack,
                                      DIAMETER_SUCCESS,
+                                     0,
+                                     0,
                                      IMPU_IMS_SUBSCRIPTION,
                                      NO_CHARGING_ADDRESSES);
 
@@ -875,6 +892,7 @@ public:
     Cx::UserAuthorizationAnswer uaa(_cx_dict,
                                     _mock_stack,
                                     hss_rc,
+                                    VENDOR_ID_3GPP,
                                     hss_experimental_rc,
                                     "",
                                     NO_CAPABILITIES);
@@ -916,6 +934,7 @@ public:
     Cx::LocationInfoAnswer lia(_cx_dict,
                                _mock_stack,
                                hss_rc,
+                               VENDOR_ID_3GPP,
                                hss_experimental_rc,
                                "",
                                NO_CAPABILITIES);
@@ -1235,7 +1254,8 @@ public:
 
     Cx::ServerAssignmentAnswer saa(_cx_dict,
                                    _mock_stack,
-                                   DIAMETER_ERROR_USER_UNKNOWN,
+                                   0,
+                                   VENDOR_ID_3GPP, DIAMETER_ERROR_USER_UNKNOWN,
                                    "",
                                    NO_CHARGING_ADDRESSES);
 
@@ -1275,7 +1295,7 @@ public:
                                "?public_id=" + IMPU);
 
     // Set the IMPU Cache TTL based on whether the IMPU cache is enabled
-    ImpiTask::Config cfg(true, (impu_cache_enabled) ? 300 : 0, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+    ImpiTask::Config cfg(true, (impu_cache_enabled) ? 300 : 0, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
     ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
     // Once the task's run function is called, expect a diameter message to be sent.
@@ -1309,6 +1329,8 @@ public:
     Cx::MultimediaAuthAnswer maa(_cx_dict,
                                  _mock_stack,
                                  DIAMETER_SUCCESS,
+                                 0,
+                                 0,
                                  SCHEME_DIGEST,
                                  digest,
                                  aka);
@@ -1354,6 +1376,36 @@ public:
 
     // Build the expected response and check it's correct.
     EXPECT_EQ(build_digest_json(digest), req.content());
+  }
+
+
+  // Utility method that, when given an IMPU reg data task performs the actions to
+  // retrieve the IMS subscription.
+  void perform_get_ims_subscription(MockHttpStack::Request& req,
+                                    ImpuRegDataTask* task)
+  {
+    MockCache::MockGetRegData mock_op;
+    EXPECT_CALL(*_cache, create_GetRegData(IMPU))
+      .WillOnce(Return(&mock_op));
+    EXPECT_DO_ASYNC(*_cache, mock_op);
+    task->run();
+
+    CassandraStore::Transaction* t = mock_op.get_trx();
+    ASSERT_FALSE(t == NULL);
+    EXPECT_CALL(mock_op, get_xml(_, _)).Times(AtLeast(1))
+      .WillRepeatedly(SetArgReferee<0>(IMPU_IMS_SUBSCRIPTION));
+    EXPECT_CALL(mock_op, get_registration_state(_, _)).Times(AtLeast(1))
+      .WillRepeatedly(SetArgReferee<0>(RegistrationState::REGISTERED));
+    EXPECT_CALL(mock_op, get_associated_impis(_)).Times(AtLeast(1));
+    EXPECT_CALL(mock_op, get_charging_addrs(_)).Times(AtLeast(1))
+      .WillRepeatedly(SetArgReferee<0>(NO_CHARGING_ADDRESSES));
+
+    // HTTP response is sent straight back - no state is changed.
+    EXPECT_CALL(*_httpstack, send_reply(_, 200, _));
+    t->on_success(&mock_op);
+
+    // Build the expected response and check it's correct
+    EXPECT_EQ(REGDATA_RESULT, req.content());
   }
 
   static void ignore_stats(bool ignore)
@@ -1425,6 +1477,7 @@ const std::string HandlersTest::DEREG_BODY_LIST2 = "{\"registrations\":[{\"prima
 const std::string HandlersTest::SCHEME_UNKNOWN = "Unknwon";
 const std::string HandlersTest::SCHEME_DIGEST = "SIP Digest";
 const std::string HandlersTest::SCHEME_AKA = "Digest-AKAv1-MD5";
+const std::string HandlersTest::SCHEME_AKAV2 = "Digest-AKAv2-SHA-256";
 const std::string HandlersTest::SIP_AUTHORIZATION = "Authorization";
 const std::deque<std::string> HandlersTest::NO_CFS = {};
 const std::deque<std::string> HandlersTest::ECFS = {"ecf1", "ecf"};
@@ -1472,7 +1525,7 @@ TEST_F(HandlersTest, DigestCache)
                              "digest",
                              "?public_id=" + IMPU);
 
-  ImpiTask::Config cfg(false);
+  ImpiTask::Config cfg(false, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect to lookup an auth
@@ -1516,7 +1569,7 @@ TEST_F(HandlersTest, DigestCacheNotFound)
                              "digest",
                              "?public_id=" + IMPU);
 
-  ImpiTask::Config cfg(false);
+  ImpiTask::Config cfg(false, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect to lookup an auth
@@ -1550,7 +1603,7 @@ TEST_F(HandlersTest, DigestCacheFailure)
                              "digest",
                              "?public_id=" + IMPU);
 
-  ImpiTask::Config cfg(false);
+  ImpiTask::Config cfg(false, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect to lookup an auth
@@ -1601,7 +1654,7 @@ TEST_F(HandlersTest, DigestHSSTimeout)
                              "digest",
                              "?public_id=" + IMPU);
 
-  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect a diameter message to be sent.
@@ -1647,7 +1700,7 @@ TEST_F(HandlersTest, DigestHSSConfigurableTimeout)
                              "?public_id=" + IMPU);
 
   // Set timeout to 300
-  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, 300);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2, 300);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect a diameter message to be sent.
@@ -1675,7 +1728,7 @@ TEST_F(HandlersTest, DigestHSSNoIMPU)
                              "digest",
                              "");
 
-  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect to look for associated
@@ -1727,6 +1780,8 @@ TEST_F(HandlersTest, DigestHSSNoIMPU)
   Cx::MultimediaAuthAnswer maa(_cx_dict,
                                _mock_stack,
                                DIAMETER_SUCCESS,
+                               0,
+                               0,
                                SCHEME_DIGEST,
                                digest,
                                aka);
@@ -1764,7 +1819,7 @@ TEST_F(HandlersTest, DigestHSSUserUnknown)
                              "digest",
                              "?public_id=" + IMPU);
 
-  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect a diameter message to be sent.
@@ -1785,6 +1840,8 @@ TEST_F(HandlersTest, DigestHSSUserUnknown)
   // Build an MAA.
   Cx::MultimediaAuthAnswer maa(_cx_dict,
                                _mock_stack,
+                               0,
+                               VENDOR_ID_3GPP,
                                DIAMETER_ERROR_USER_UNKNOWN,
                                SCHEME_DIGEST,
                                digest,
@@ -1807,7 +1864,7 @@ TEST_F(HandlersTest, DigestHSSOtherError)
                              "digest",
                              "?public_id=" + IMPU);
 
-  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect a diameter message to be sent.
@@ -1828,6 +1885,8 @@ TEST_F(HandlersTest, DigestHSSOtherError)
   // Build an MAA.
   Cx::MultimediaAuthAnswer maa(_cx_dict,
                                _mock_stack,
+                               0,
+                               0,
                                0,
                                SCHEME_DIGEST,
                                digest,
@@ -1850,7 +1909,7 @@ TEST_F(HandlersTest, DigestHSSUnkownScheme)
                              "digest",
                              "?public_id=" + IMPU);
 
-  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect a diameter message to be sent.
@@ -1872,6 +1931,8 @@ TEST_F(HandlersTest, DigestHSSUnkownScheme)
   Cx::MultimediaAuthAnswer maa(_cx_dict,
                                _mock_stack,
                                DIAMETER_SUCCESS,
+                               0,
+                               0,
                                SCHEME_UNKNOWN,
                                digest,
                                aka);
@@ -1893,7 +1954,7 @@ TEST_F(HandlersTest, DigestHSSAKAReturned)
                              "digest",
                              "?public_id=" + IMPU);
 
-  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect a diameter message to be sent.
@@ -1915,6 +1976,8 @@ TEST_F(HandlersTest, DigestHSSAKAReturned)
   Cx::MultimediaAuthAnswer maa(_cx_dict,
                                _mock_stack,
                                DIAMETER_SUCCESS,
+                               0,
+                               0,
                                SCHEME_AKA,
                                digest,
                                aka);
@@ -1935,7 +1998,7 @@ TEST_F(HandlersTest, DigestNoCachedIMPUs)
                              "/impi/" + IMPI,
                              "digest",
                              "");
-  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect to look for associated
@@ -1969,7 +2032,7 @@ TEST_F(HandlersTest, DigestIMPUNotFound)
                              "digest",
                              "");
 
-  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect to look for associated
@@ -2005,7 +2068,7 @@ TEST_F(HandlersTest, DigestNoIMPUCacheConnectionFailure)
                              "digest",
                              "");
 
-  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect to look for associated
@@ -2040,7 +2103,7 @@ TEST_F(HandlersTest, DigestNoIMPUCacheFailure)
                              "digest",
                              "");
 
-  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect to look for associated
@@ -2074,7 +2137,7 @@ TEST_F(HandlersTest, AvCache)
                              "av",
                              "?impu=" + IMPU);
 
-  ImpiTask::Config cfg(false);
+  ImpiTask::Config cfg(false, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiAvTask* task = new ImpiAvTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect to lookup an auth
@@ -2115,7 +2178,7 @@ TEST_F(HandlersTest, AvEmptyQoP)
                              "av",
                              "?impu=" + IMPU);
 
-  ImpiTask::Config cfg(false);
+  ImpiTask::Config cfg(false, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiAvTask* task = new ImpiAvTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect to lookup an auth
@@ -2158,7 +2221,7 @@ TEST_F(HandlersTest, AvNoPublicIDHSSAKA)
                              "/impi/" + IMPI,
                              "av",
                              "?resync-auth=" + base64_encode(SIP_AUTHORIZATION));
-  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiAvTask* task = new ImpiAvTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect to look for associated
@@ -2211,6 +2274,8 @@ TEST_F(HandlersTest, AvNoPublicIDHSSAKA)
   Cx::MultimediaAuthAnswer maa(_cx_dict,
                                _mock_stack,
                                DIAMETER_SUCCESS,
+                               0,
+                               0,
                                SCHEME_AKA,
                                digest,
                                aka);
@@ -2231,6 +2296,67 @@ TEST_F(HandlersTest, AvNoPublicIDHSSAKA)
   EXPECT_EQ(build_aka_json(encoded_aka), req.content());
 }
 
+TEST_F(HandlersTest, AvHSSAKAv2)
+{
+  // This test requests AKAv2 authentication and checks that it is handled
+  // correctly.
+  MockHttpStack::Request req(_httpstack,
+                             "/impi/" + IMPI,
+                             "aka2",
+                             "?impu=" + IMPU + "&resync-auth=" + base64_encode(SIP_AUTHORIZATION));
+
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
+  ImpiAvTask* task = new ImpiAvTask(req, &cfg, FAKE_TRAIL_ID);
+
+  // Once the task's run function is called, expect a diameter message to be
+  // sent.
+  EXPECT_CALL(*_mock_stack, send(_, _, 200))
+    .Times(1)
+    .WillOnce(WithArgs<0,1>(Invoke(store_msg_tsx)));
+  task->run();
+  ASSERT_FALSE(_caught_diam_tsx == NULL);
+
+  // Turn the caught Diameter msg structure into an MAR and check its contents.
+  // All we care about in this case is that the akav2 URL triggers the AKAv2
+  // auth scheme.
+  Diameter::Message msg(_cx_dict, _caught_fd_msg, _mock_stack);
+  Cx::MultimediaAuthRequest mar(msg);
+  EXPECT_EQ(SCHEME_AKAV2, mar.sip_auth_scheme());
+
+  DigestAuthVector digest;
+  AKAAuthVector aka;
+  aka.challenge = "challenge";
+  aka.response = "response";
+  aka.crypt_key = "crypt_key";
+  aka.integrity_key = "integrity_key";
+
+  // Build an MAA with an AKAv2 scheme specified.
+  Cx::MultimediaAuthAnswer maa(_cx_dict,
+                               _mock_stack,
+                               DIAMETER_SUCCESS,
+                               0,
+                               0,
+                               SCHEME_AKAV2,
+                               digest,
+                               aka);
+
+  // Once it receives the MAA, check that a successful HTTP response is sent.
+  EXPECT_CALL(*_httpstack, send_reply(_, 200, _));
+  _caught_diam_tsx->on_response(maa);
+  _caught_fd_msg = NULL;
+  delete _caught_diam_tsx; _caught_diam_tsx = NULL;
+
+  // Build the expected response and check it's correct. We need to first
+  // encode the values we sent earlier into base64 or hex. This is hardcoded.
+  AKAAuthVector encoded_aka;
+  encoded_aka.challenge = "Y2hhbGxlbmdl";
+  encoded_aka.response = "726573706f6e7365";
+  encoded_aka.crypt_key = "63727970745f6b6579";
+  encoded_aka.integrity_key = "696e746567726974795f6b6579";
+  encoded_aka.version = 2;
+  EXPECT_EQ(build_aka_json(encoded_aka), req.content());
+}
+
 TEST_F(HandlersTest, AuthInvalidScheme)
 {
   // This test tests an Impi Av task case with an invalid scheme on the HTTP
@@ -2240,7 +2366,7 @@ TEST_F(HandlersTest, AuthInvalidScheme)
                              "invalid",
                              "");
 
-  ImpiTask::Config cfg(true);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiAvTask* task = new ImpiAvTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect a 404 HTTP response.
@@ -2257,7 +2383,7 @@ TEST_F(HandlersTest, AkaNoIMPU)
                              "aka",
                              "");
 
-  ImpiTask::Config cfg(true);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiAvTask* task = new ImpiAvTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect a 404 HTTP response.
@@ -2326,20 +2452,42 @@ TEST_F(HandlersTest, IMSSubscriptionHSS_ReregNewBinding)
 }
 
 // Re-registration with no new binding, but with cached responses not allowed.
-// This means homestead still sends a SAR.
+// This means homestead still sends a SAR. We need the cache to be valid, i.e.
+// more than 3600.
 TEST_F(HandlersTest, IMSSubscriptionHSS_ReregCacheNotallowed)
 {
   MockHttpStack::Request req = make_request("reg", true, true);
   req.add_header_to_incoming_req("Cache-control", "no-cache");
-  reg_data_template(req, true, true, false, RegistrationState::REGISTERED, 2);
+  reg_data_template(req, true, true, false, RegistrationState::REGISTERED, 2, 7200);
 }
 
 // Re-registration when the database record is not old enough to
 // trigger a new SAR.
-
 TEST_F(HandlersTest, IMSSubscriptionHSS_ReregWithoutSAR)
 {
   reg_data_template_no_sar("reg", true, RegistrationState::REGISTERED);
+}
+
+// Re-registration when configured to always send a SAR - i.e.
+// hss_reregistration_timeout = 0. The ttl on the record is
+// expected to be 310
+TEST_F(HandlersTest, IMSSubscriptionHSS_ReregWithSARAlways)
+{
+  MockHttpStack::Request req = make_request("reg", true, true);
+  reg_data_template(req,
+                    true,
+                    true,
+                    false,
+                    RegistrationState::REGISTERED,
+                    2,
+                    310,
+                    REGDATA_RESULT,
+                    RegistrationState::REGISTERED,
+                    false,
+                    CassandraStore::OK,
+                    0,
+                    300,
+                    310);
 }
 
 // Call to a registered subscriber
@@ -2409,6 +2557,12 @@ TEST_F(HandlersTest, IMSSubscriptionDeregHSSCacheFail)
 TEST_F(HandlersTest, IMSSubscriptionDeregHSSCacheFailBenign)
 {
   reg_data_template_with_deletion("dereg-user", true, true, RegistrationState::REGISTERED, 5, 3600, REGDATA_RESULT_DEREG, RegistrationState::NOT_REGISTERED, CassandraStore::NOT_FOUND);
+}
+
+// Test that an unregistered user is deregistered with the HSS.
+TEST_F(HandlersTest, IMSSubscriptionDeregUnregSub)
+{
+  reg_data_template_with_deletion("dereg-user", true, true, RegistrationState::UNREGISTERED, 5);
 }
 
 // Test the two authentication failure flows (which should only affect
@@ -2706,28 +2860,7 @@ TEST_F(HandlersTest, IMSSubscriptionGet)
   ImpuRegDataTask::Config cfg(true, 3600);
   ImpuRegDataTask* task = new ImpuRegDataTask(req, &cfg, FAKE_TRAIL_ID);
 
-  MockCache::MockGetRegData mock_op;
-  EXPECT_CALL(*_cache, create_GetRegData(IMPU))
-    .WillOnce(Return(&mock_op));
-  EXPECT_DO_ASYNC(*_cache, mock_op);
-  task->run();
-
-  CassandraStore::Transaction* t = mock_op.get_trx();
-  ASSERT_FALSE(t == NULL);
-  EXPECT_CALL(mock_op, get_xml(_, _)).Times(AtLeast(1))
-    .WillRepeatedly(SetArgReferee<0>(IMPU_IMS_SUBSCRIPTION));
-  EXPECT_CALL(mock_op, get_registration_state(_, _)).Times(AtLeast(1))
-    .WillRepeatedly(SetArgReferee<0>(RegistrationState::REGISTERED));
-  EXPECT_CALL(mock_op, get_associated_impis(_)).Times(AtLeast(1));
-  EXPECT_CALL(mock_op, get_charging_addrs(_)).Times(AtLeast(1))
-    .WillRepeatedly(SetArgReferee<0>(NO_CHARGING_ADDRESSES));
-
-  // HTTP response is sent straight back - no state is changed.
-  EXPECT_CALL(*_httpstack, send_reply(_, 200, _));
-  t->on_success(&mock_op);
-
-  // Build the expected response and check it's correct
-  EXPECT_EQ(REGDATA_RESULT, req.content());
+  perform_get_ims_subscription(req, task);
 }
 
 // Test error handling
@@ -2822,6 +2955,8 @@ TEST_F(HandlersTest, IMSSubscriptionOtherErrorCallReg)
 
   Cx::ServerAssignmentAnswer saa(_cx_dict,
                                  _mock_stack,
+                                 0,
+                                 0,
                                  0,
                                  "",
                                  NO_CHARGING_ADDRESSES);
@@ -2938,6 +3073,37 @@ TEST_F(HandlersTest, IMSSubscriptionCacheFailure)
   t->on_failure(&mock_op);
 }
 
+TEST_F(HandlersTest, ReadRegDataSuccess)
+{
+  MockHttpStack::Request req(_httpstack,
+                             "/impu/" + IMPU + "/reg-data",
+                             "",
+                             "",
+                             "",
+                             htp_method_GET);
+  ImpuRegDataTask::Config cfg(true, 3600);
+  ImpuReadRegDataTask* task = new ImpuReadRegDataTask(req, &cfg, FAKE_TRAIL_ID);
+
+  perform_get_ims_subscription(req, task);
+}
+
+TEST_F(HandlersTest, ReadRegDataBadMethod)
+{
+  // Try to PUT to the read only API.
+  MockHttpStack::Request req(_httpstack,
+                             "/impu/" + IMPU + "/reg-data",
+                             "",
+                             "",
+                             "",
+                             htp_method_PUT);
+  ImpuRegDataTask::Config cfg(true, 3600);
+  ImpuReadRegDataTask* task = new ImpuReadRegDataTask(req, &cfg, FAKE_TRAIL_ID);
+
+  // This gets a 405 Bad Method.
+  EXPECT_CALL(*_httpstack, send_reply(_, 405, _));
+  task->run();
+}
+
 TEST_F(HandlersTest, RegistrationStatusHSSTimeout)
 {
   // This test tests the common diameter timeout function. Build the HTTP request
@@ -3038,6 +3204,7 @@ TEST_F(HandlersTest, RegistrationStatus)
                                   _mock_stack,
                                   DIAMETER_SUCCESS,
                                   0,
+                                  0,
                                   SERVER_NAME,
                                   CAPABILITIES);
   EXPECT_CALL(*_httpstack, send_reply(_, 200, _));
@@ -3076,6 +3243,7 @@ TEST_F(HandlersTest, RegistrationStatusPassesHealthCheck)
   Cx::UserAuthorizationAnswer uaa(_cx_dict,
                                   _mock_stack,
                                   DIAMETER_SUCCESS,
+                                  0,
                                   0,
                                   SERVER_NAME,
                                   CAPABILITIES);
@@ -3134,6 +3302,7 @@ TEST_F(HandlersTest, RegistrationStatusOptParamsSubseqRegCapabs)
   Cx::UserAuthorizationAnswer uaa(_cx_dict,
                                   _mock_stack,
                                   0,
+                                  VENDOR_ID_3GPP,
                                   DIAMETER_SUBSEQUENT_REGISTRATION,
                                   "",
                                   CAPABILITIES_WITH_SERVER_NAME);
@@ -3187,6 +3356,7 @@ TEST_F(HandlersTest, RegistrationStatusFirstRegNoCapabs)
   Cx::UserAuthorizationAnswer uaa(_cx_dict,
                                   _mock_stack,
                                   0,
+                                  VENDOR_ID_3GPP,
                                   DIAMETER_FIRST_REGISTRATION,
                                   "",
                                   NO_CAPABILITIES);
@@ -3317,6 +3487,7 @@ TEST_F(HandlersTest, LocationInfo)
                              _mock_stack,
                              DIAMETER_SUCCESS,
                              0,
+                             0,
                              SERVER_NAME,
                              CAPABILITIES);
   EXPECT_CALL(*_httpstack, send_reply(_, 200, _));
@@ -3370,6 +3541,7 @@ TEST_F(HandlersTest, LocationInfoOptParamsUnregisteredService)
   Cx::LocationInfoAnswer lia(_cx_dict,
                              _mock_stack,
                              0,
+                             VENDOR_ID_3GPP,
                              DIAMETER_UNREGISTERED_SERVICE,
                              "",
                              CAPABILITIES_WITH_SERVER_NAME);
@@ -3411,6 +3583,7 @@ TEST_F(HandlersTest, LocationInfoUnregisteredError)
   Cx::LocationInfoAnswer lia(_cx_dict,
                              _mock_stack,
                              0,
+                             VENDOR_ID_3GPP,
                              DIAMETER_ERROR_IDENTITY_NOT_REGISTERED,
                              "",
                              NO_CAPABILITIES);
@@ -4381,7 +4554,7 @@ TEST_F(HandlerStatsTest, DigestCache)
                              "digest",
                              "?public_id=" + IMPU);
 
-  ImpiTask::Config cfg(false);
+  ImpiTask::Config cfg(false, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Handler does a cache digest lookup.
@@ -4423,7 +4596,7 @@ TEST_F(HandlerStatsTest, DigestCacheFailure)
                              "digest",
                              "?public_id=" + IMPU);
 
-  ImpiTask::Config cfg(false);
+  ImpiTask::Config cfg(false, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Handler does a cache digest lookup.
@@ -4461,7 +4634,7 @@ TEST_F(HandlerStatsTest, DigestCacheConnectionFailure)
                              "digest",
                              "?public_id=" + IMPU);
 
-  ImpiTask::Config cfg(false);
+  ImpiTask::Config cfg(false, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Handler does a cache digest lookup.
@@ -4494,7 +4667,7 @@ TEST_F(HandlerStatsTest, DigestHSS)
                              "digest",
                              "?public_id=" + IMPU);
 
-  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect a diameter message to be sent.
@@ -4522,6 +4695,8 @@ TEST_F(HandlerStatsTest, DigestHSS)
   Cx::MultimediaAuthAnswer maa(_cx_dict,
                                _mock_stack,
                                DIAMETER_SUCCESS,
+                               0,
+                               0,
                                SCHEME_DIGEST,
                                digest,
                                aka);
@@ -4557,7 +4732,7 @@ TEST_F(HandlerStatsTest, DigestHSSTimeout)
                              "digest",
                              "?public_id=" + IMPU);
 
-  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA);
+  ImpiTask::Config cfg(true, 300, SCHEME_UNKNOWN, SCHEME_DIGEST, SCHEME_AKA, SCHEME_AKAV2);
   ImpiDigestTask* task = new ImpiDigestTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect a diameter message to be sent.
@@ -4594,7 +4769,7 @@ TEST_F(HandlerStatsTest, IMSSubscriptionReregHSS)
                              "{\"reqtype\": \"reg\"}",
                              htp_method_PUT);
 
-  ImpuRegDataTask::Config cfg(true, 1800);
+  ImpuRegDataTask::Config cfg(true, 1800, 3600);
   ImpuRegDataTask* task = new ImpuRegDataTask(req, &cfg, FAKE_TRAIL_ID);
 
   // Once the task's run function is called, expect to lookup IMS
@@ -4643,6 +4818,8 @@ TEST_F(HandlerStatsTest, IMSSubscriptionReregHSS)
   Cx::ServerAssignmentAnswer saa(_cx_dict,
                                  _mock_stack,
                                  DIAMETER_SUCCESS,
+                                 0,
+                                 0,
                                  IMS_SUBSCRIPTION,
                                  NO_CHARGING_ADDRESSES);
 
@@ -4679,7 +4856,6 @@ TEST_F(HandlerStatsTest, IMSSubscriptionReregHSS)
   delete _caught_diam_tsx; _caught_diam_tsx = NULL;
 }
 
-
 TEST_F(HandlerStatsTest, RegistrationStatus)
 {
   // Check a UAR request updated the HSS and subscription stats.
@@ -4711,6 +4887,7 @@ TEST_F(HandlerStatsTest, RegistrationStatus)
   Cx::UserAuthorizationAnswer uaa(_cx_dict,
                                   _mock_stack,
                                   DIAMETER_SUCCESS,
+                                  0,
                                   0,
                                   SERVER_NAME,
                                   CAPABILITIES);
@@ -4752,6 +4929,7 @@ TEST_F(HandlerStatsTest, LocationInfo)
   Cx::LocationInfoAnswer lia(_cx_dict,
                              _mock_stack,
                              DIAMETER_SUCCESS,
+                             0,
                              0,
                              SERVER_NAME,
                              CAPABILITIES);
@@ -4797,6 +4975,7 @@ TEST_F(HandlerStatsTest, LocationInfoOverload)
                              _mock_stack,
                              DIAMETER_TOO_BUSY,
                              0,
+                             0,
                              SERVER_NAME,
                              CAPABILITIES);
   EXPECT_CALL(*_httpstack, record_penalty());
@@ -4806,4 +4985,114 @@ TEST_F(HandlerStatsTest, LocationInfoOverload)
 
   _caught_diam_tsx->on_response(lia);
   delete _caught_diam_tsx; _caught_diam_tsx = NULL;
+}
+
+//
+// Tests related to listing IMPUs.
+//
+
+TEST_F(HandlersTest, ListImpusNonePresent)
+{
+  MockHttpStack::Request req(_httpstack, "/impu/", "");
+
+  ImpuListTask::Config cfg;
+  ImpuListTask* task = new ImpuListTask(req, &cfg, FAKE_TRAIL_ID);
+
+  MockCache::MockListImpus mock_op;
+  EXPECT_CALL(*_cache, create_ListImpus()).WillOnce(Return(&mock_op));
+  EXPECT_DO_ASYNC(*_cache, mock_op);
+  task->run();
+
+  std::vector<std::string> impus_to_return;
+  CassandraStore::Transaction* t = mock_op.get_trx();
+  ASSERT_FALSE(t == NULL);
+  EXPECT_CALL(mock_op, get_impus_reference())
+    .Times(AtLeast(1)).WillRepeatedly(ReturnRef(impus_to_return));
+  EXPECT_CALL(*_httpstack, send_reply(_, 200, _));
+
+  t->on_success(&mock_op);
+
+  EXPECT_EQ("{\"impus\":[]}", req.content());
+}
+
+TEST_F(HandlersTest, ListImpusOnePresent)
+{
+  MockHttpStack::Request req(_httpstack, "/impu/", "");
+
+  ImpuListTask::Config cfg;
+  ImpuListTask* task = new ImpuListTask(req, &cfg, FAKE_TRAIL_ID);
+
+  MockCache::MockListImpus mock_op;
+  EXPECT_CALL(*_cache, create_ListImpus()).WillOnce(Return(&mock_op));
+  EXPECT_DO_ASYNC(*_cache, mock_op);
+  task->run();
+
+  std::vector<std::string> impus_to_return = {"kermit"};
+  CassandraStore::Transaction* t = mock_op.get_trx();
+  ASSERT_FALSE(t == NULL);
+  EXPECT_CALL(mock_op, get_impus_reference())
+    .Times(AtLeast(1)).WillRepeatedly(ReturnRef(impus_to_return));
+  EXPECT_CALL(*_httpstack, send_reply(_, 200, _));
+
+  t->on_success(&mock_op);
+
+  EXPECT_EQ("{\"impus\":[\"kermit\"]}", req.content());
+}
+
+TEST_F(HandlersTest, ListImpusTwoPresent)
+{
+  MockHttpStack::Request req(_httpstack, "/impu/", "");
+
+  ImpuListTask::Config cfg;
+  ImpuListTask* task = new ImpuListTask(req, &cfg, FAKE_TRAIL_ID);
+
+  MockCache::MockListImpus mock_op;
+  EXPECT_CALL(*_cache, create_ListImpus()).WillOnce(Return(&mock_op));
+  EXPECT_DO_ASYNC(*_cache, mock_op);
+  task->run();
+
+  std::vector<std::string> impus_to_return = {"kermit", "gonzo"};
+  CassandraStore::Transaction* t = mock_op.get_trx();
+  ASSERT_FALSE(t == NULL);
+  EXPECT_CALL(mock_op, get_impus_reference())
+    .Times(AtLeast(1)).WillRepeatedly(ReturnRef(impus_to_return));
+  EXPECT_CALL(*_httpstack, send_reply(_, 200, _));
+
+  t->on_success(&mock_op);
+
+  EXPECT_EQ("{\"impus\":[\"kermit\",\"gonzo\"]}", req.content());
+}
+
+TEST_F(HandlersTest, ListImpusDatabaseError)
+{
+  MockHttpStack::Request req(_httpstack, "/impu/", "");
+
+  ImpuListTask::Config cfg;
+  ImpuListTask* task = new ImpuListTask(req, &cfg, FAKE_TRAIL_ID);
+
+  MockCache::MockListImpus mock_op;
+  EXPECT_CALL(*_cache, create_ListImpus()).WillOnce(Return(&mock_op));
+  EXPECT_DO_ASYNC(*_cache, mock_op);
+  task->run();
+
+  std::vector<std::string> impus_to_return = {"kermit", "gonzo"};
+  CassandraStore::Transaction* t = mock_op.get_trx();
+  ASSERT_FALSE(t == NULL);
+  EXPECT_CALL(*_httpstack, send_reply(_, 500, _));
+
+  t->on_failure(&mock_op);
+
+  EXPECT_EQ("", req.content());
+}
+
+TEST_F(HandlersTest, ListImpusWrongMethod)
+{
+  MockHttpStack::Request req(_httpstack, "/impu/", "", "", "", htp_method_PUT);
+
+  ImpuListTask::Config cfg;
+  ImpuListTask* task = new ImpuListTask(req, &cfg, FAKE_TRAIL_ID);
+
+  EXPECT_CALL(*_httpstack, send_reply(_, 405, _));
+  task->run();
+  EXPECT_EQ("", req.content());
 }

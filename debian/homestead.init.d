@@ -100,23 +100,17 @@ get_settings()
         scscf=5054
         impu_cache_ttl=0
         max_peers=2
+        hss_reregistration_time=1800
         reg_max_expires=300
         log_level=2
         num_http_threads=$(($(grep processor /proc/cpuinfo | wc -l) * 50))
+
+        hss_mar_scheme_unknown="Unknown"
+        hss_mar_scheme_digest="SIP Digest"
+        hss_mar_scheme_akav1="Digest-AKAv1-MD5"
+        hss_mar_scheme_akav2="Digest-AKAv2-SHA-256"
+
         . /etc/clearwater/config
-
-        if [ -z $hss_reregistration_time ]
-        then
-          # Default hss_reregistration_time to max(1800, $reg_max_expires/2), so
-          # that homestead only discards expired registration data when sprout
-          # does (at the earliest).
-          hss_reregistration_time=$(( $reg_max_expires / 2 ))
-
-          if [ $hss_reregistration_time -lt 1800 ]
-          then
-            hss_reregistration_time=1800
-          fi
-        fi
 
         # Derive server_name and sprout_http_name from other settings
         if [ -n "$scscf_uri" ]
@@ -129,7 +123,7 @@ get_settings()
           server_name="sip:scscf.$sprout_hostname:$scscf;transport=TCP"
         fi
 
-        sprout_http_name=$(python /usr/share/clearwater/bin/bracket_ipv6_address.py $sprout_hostname):9888
+        sprout_http_name=$(/usr/share/clearwater/bin/bracket-ipv6-address $sprout_hostname):9888
 
         # Work out which features are enabled.
         if [ -d /etc/clearwater/features.d ]
@@ -164,9 +158,6 @@ get_daemon_args()
           diameter_timeout_ms=$(( ($target_latency_us + 499)/500 ))
         fi
 
-        [ "$hss_mar_lowercase_unknown" != "Y" ] || scheme_args="--scheme-unknown=unknown"
-        [ "$hss_mar_force_digest" != "Y" ] || scheme_args="--scheme-unknown=\"SIP Digest\" --scheme-digest=\"SIP Digest\" --scheme-aka=\"SIP Digest\""
-        [ "$hss_mar_force_aka" != "Y" ] || scheme_args="--scheme-unknown=Digest-AKAv1-MD5 --scheme-digest=Digest-AKAv1-MD5 --scheme-aka=Digest-AKAv1-MD5"
         [ "$sas_use_signaling_interface" != "Y" ] || sas_signaling_if_arg="--sas-use-signaling-interface"
 
         [ -z "$diameter_timeout_ms" ] || diameter_timeout_ms_arg="--diameter-timeout-ms=$diameter_timeout_ms"
@@ -176,6 +167,7 @@ get_daemon_args()
         [ -z "$init_token_rate" ] || init_token_rate_arg="--init-token-rate=$init_token_rate"
         [ -z "$min_token_rate" ] || min_token_rate_arg="--min-token-rate=$min_token_rate"
         [ -z "$exception_max_ttl" ] || exception_max_ttl_arg="--exception-max-ttl=$exception_max_ttl"
+        [ -z "$cassandra_hostname" ] || cassandra_arg="--cassandra=$cassandra_hostname"
 
         DAEMON_ARGS="--localhost=$local_ip
                      --home-domain=$home_domain
@@ -183,6 +175,7 @@ get_daemon_args()
                      --dns-server=$signaling_dns_server
                      --http=$local_ip
                      --http-threads=$num_http_threads
+                     $cassandra_arg
                      $dest_realm
                      --dest-host=$hss_hostname
                      --hss-peer=$force_hss_peer
@@ -190,8 +183,12 @@ get_daemon_args()
                      --server-name=\"$server_name\"
                      --impu-cache-ttl=$impu_cache_ttl
                      --hss-reregistration-time=$hss_reregistration_time
+                     --reg-max-expires=$reg_max_expires
                      --sprout-http-name=$sprout_http_name
-                     $scheme_args
+                     --scheme-unknown=\"$hss_mar_scheme_unknown\"
+                     --scheme-digest=\"$hss_mar_scheme_digest\"
+                     --scheme-akav1=\"$hss_mar_scheme_akav1\"
+                     --scheme-akav2=\"$hss_mar_scheme_akav2\"
                      $diameter_timeout_ms_arg
                      $target_latency_us_arg
                      $max_tokens_arg
@@ -202,8 +199,7 @@ get_daemon_args()
                      --access-log=$log_directory
                      --log-file=$log_directory
                      --log-level=$log_level
-                     --sas=$sas_server,$NAME@$public_hostname
-                     --pidfile=$PIDFILE"
+                     --sas=$sas_server,$NAME@$public_hostname"
 
         [ "$http_blacklist_duration" = "" ]     || DAEMON_ARGS="$DAEMON_ARGS --http-blacklist-duration=$http_blacklist_duration"
         [ "$diameter_blacklist_duration" = "" ] || DAEMON_ARGS="$DAEMON_ARGS --diameter-blacklist-duration=$diameter_blacklist_duration"
@@ -228,7 +224,7 @@ do_start()
         # daemon is not running, so attempt to start it.
         setup_environment
         get_daemon_args
-        eval $namespace_prefix start-stop-daemon --start --quiet --background --pidfile $PIDFILE --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS \
+        eval $namespace_prefix start-stop-daemon --start --quiet --background --pidfile $PIDFILE --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS --pidfile=$PIDFILE --daemon \
                 || return 2
         # Add code here, if necessary, that waits for the process to be ready
         # to handle requests from services started subsequently which depend
@@ -260,7 +256,7 @@ do_run()
 
         setup_environment
         get_daemon_args
-        eval $namespace_prefix start-stop-daemon --start --quiet --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS \
+        eval $namespace_prefix start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON --chuid $NAME --chdir $HOME -- $DAEMON_ARGS --pidfile=$PIDFILE \
                 || return 2
 }
 

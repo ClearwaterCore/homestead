@@ -37,6 +37,7 @@
 #include "cx.h"
 
 #include "log.h"
+#include "base64.h"
 
 #include <string>
 #include <sstream>
@@ -139,6 +140,7 @@ UserAuthorizationRequest::UserAuthorizationRequest(const Dictionary* dict,
 UserAuthorizationAnswer::UserAuthorizationAnswer(const Dictionary* dict,
                                                  Diameter::Stack* stack,
                                                  const int32_t& result_code,
+                                                 const uint32_t& vendor_id,
                                                  const int32_t& experimental_result_code,
                                                  const std::string& server_name,
                                                  const ServerCapabilities& capabs) :
@@ -155,6 +157,7 @@ UserAuthorizationAnswer::UserAuthorizationAnswer(const Dictionary* dict,
   else
   {
     Diameter::AVP experimental_result(dict->EXPERIMENTAL_RESULT);
+    experimental_result.add(Diameter::AVP(dict->VENDOR_ID).val_u32(vendor_id));
     experimental_result.add(Diameter::AVP(dict->EXPERIMENTAL_RESULT_CODE).val_i32(experimental_result_code));
     add(experimental_result);
   }
@@ -194,31 +197,36 @@ ServerCapabilities UserAuthorizationAnswer::server_capabilities() const
 {
   ServerCapabilities server_capabilities({}, {}, "");
 
-  // Server capabilities are grouped into mandatory capabilities and optional capabilities
-  // underneath the SERVER_CAPABILITIES AVP.
+  // Server capabilities are grouped into mandatory capabilities and optional
+  // capabilities underneath the SERVER_CAPABILITIES AVP.
   TRC_DEBUG("Getting server capabilties from User-Authorization answer");
-  Diameter::AVP::iterator avps = begin(((Cx::Dictionary*)dict())->SERVER_CAPABILITIES);
-  if (avps != end())
+  Diameter::AVP::iterator server_capabilities_avp =
+                         begin(((Cx::Dictionary*)dict())->SERVER_CAPABILITIES);
+  if (server_capabilities_avp != end())
   {
-    Diameter::AVP::iterator avps2 = avps->begin(((Cx::Dictionary*)dict())->MANDATORY_CAPABILITY);
-    while (avps2 != avps->end())
+    Diameter::AVP::iterator mandatory_capability_avp =
+      server_capabilities_avp->begin(((Cx::Dictionary*)dict())->MANDATORY_CAPABILITY);
+    while (mandatory_capability_avp != server_capabilities_avp->end())
     {
-      TRC_DEBUG("Found mandatory capability %d", avps2->val_i32());
-      server_capabilities.mandatory_capabilities.push_back(avps2->val_i32());
-      avps2++;
+      TRC_DEBUG("Found mandatory capability %d", mandatory_capability_avp->val_i32());
+      server_capabilities.mandatory_capabilities.push_back(mandatory_capability_avp->val_i32());
+      mandatory_capability_avp++;
     }
-    avps2 = avps->begin(((Cx::Dictionary*)dict())->OPTIONAL_CAPABILITY);
-    while (avps2 != avps->end())
+
+    Diameter::AVP::iterator optional_capability_avp =
+      server_capabilities_avp->begin(((Cx::Dictionary*)dict())->OPTIONAL_CAPABILITY);
+    while (optional_capability_avp != server_capabilities_avp->end())
     {
-      TRC_DEBUG("Found optional capability %d", avps2->val_i32());
-      server_capabilities.optional_capabilities.push_back(avps2->val_i32());
-      avps2++;
+      TRC_DEBUG("Found optional capability %d", optional_capability_avp->val_i32());
+      server_capabilities.optional_capabilities.push_back(optional_capability_avp->val_i32());
+      optional_capability_avp++;
     }
-    avps2 = avps->begin(((Cx::Dictionary*)dict())->SERVER_NAME);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator server_name_avp =
+        server_capabilities_avp->begin(((Cx::Dictionary*)dict())->SERVER_NAME);
+    if (server_name_avp != server_capabilities_avp->end())
     {
-      TRC_DEBUG("Found server name %s", avps2->val_str().c_str());
-      server_capabilities.server_name = avps2->val_str();
+      TRC_DEBUG("Found server name %s", server_name_avp->val_str().c_str());
+      server_capabilities.server_name = server_name_avp->val_str();
     }
   }
 
@@ -264,6 +272,7 @@ LocationInfoRequest::LocationInfoRequest(const Dictionary* dict,
 LocationInfoAnswer::LocationInfoAnswer(const Dictionary* dict,
                                        Diameter::Stack* stack,
                                        const int32_t& result_code,
+                                       const uint32_t& vendor_id,
                                        const int32_t& experimental_result_code,
                                        const std::string& server_name,
                                        const ServerCapabilities& capabs) :
@@ -280,6 +289,7 @@ LocationInfoAnswer::LocationInfoAnswer(const Dictionary* dict,
   else
   {
     Diameter::AVP experimental_result(dict->EXPERIMENTAL_RESULT);
+    experimental_result.add(Diameter::AVP(dict->VENDOR_ID).val_u32(vendor_id));
     experimental_result.add(Diameter::AVP(dict->EXPERIMENTAL_RESULT_CODE).val_i32(experimental_result_code));
     add(experimental_result);
   }
@@ -321,31 +331,35 @@ ServerCapabilities LocationInfoAnswer::server_capabilities() const
 {
   ServerCapabilities server_capabilities({}, {}, "");
 
-  // Server capabilities are grouped into mandatory capabilities and optional capabilities
-  // underneath the SERVER_CAPABILITIES AVP.
-  TRC_DEBUG("Getting server capabilties from Location-Info answer");
-  Diameter::AVP::iterator avps = begin(((Cx::Dictionary*)dict())->SERVER_CAPABILITIES);
-  if (avps != end())
+  // Server capabilities are grouped into mandatory capabilities and optional
+  // capabilities underneath the SERVER_CAPABILITIES AVP.
+  Diameter::AVP::iterator server_capabilities_avp =
+                         begin(((Cx::Dictionary*)dict())->SERVER_CAPABILITIES);
+  if (server_capabilities_avp != end())
   {
-    Diameter::AVP::iterator avps2 = avps->begin(((Cx::Dictionary*)dict())->MANDATORY_CAPABILITY);
-    while (avps2 != avps->end())
+    Diameter::AVP::iterator mandatory_capability_avp =
+      server_capabilities_avp->begin(((Cx::Dictionary*)dict())->MANDATORY_CAPABILITY);
+    while (mandatory_capability_avp != server_capabilities_avp->end())
     {
-      TRC_DEBUG("Found mandatory capability %d", avps2->val_i32());
-      server_capabilities.mandatory_capabilities.push_back(avps2->val_i32());
-      avps2++;
+      TRC_DEBUG("Found mandatory capability %d", mandatory_capability_avp->val_i32());
+      server_capabilities.mandatory_capabilities.push_back(mandatory_capability_avp->val_i32());
+      mandatory_capability_avp++;
     }
-    avps2 = avps->begin(((Cx::Dictionary*)dict())->OPTIONAL_CAPABILITY);
-    while (avps2 != avps->end())
+
+    Diameter::AVP::iterator optional_capability_avp =
+      server_capabilities_avp->begin(((Cx::Dictionary*)dict())->OPTIONAL_CAPABILITY);
+    while (optional_capability_avp != server_capabilities_avp->end())
     {
-      TRC_DEBUG("Found optional capability %d", avps2->val_i32());
-      server_capabilities.optional_capabilities.push_back(avps2->val_i32());
-      avps2++;
+      TRC_DEBUG("Found optional capability %d", optional_capability_avp->val_i32());
+      server_capabilities.optional_capabilities.push_back(optional_capability_avp->val_i32());
+      optional_capability_avp++;
     }
-    avps2 = avps->begin(((Cx::Dictionary*)dict())->SERVER_NAME);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator server_name_avp =
+        server_capabilities_avp->begin(((Cx::Dictionary*)dict())->SERVER_NAME);
+    if (server_name_avp != server_capabilities_avp->end())
     {
-      TRC_DEBUG("Found server name %s", avps2->val_str().c_str());
-      server_capabilities.server_name = avps2->val_str();
+      TRC_DEBUG("Found server name %s", server_name_avp->val_str().c_str());
+      server_capabilities.server_name = server_name_avp->val_str();
     }
   }
 
@@ -390,13 +404,15 @@ MultimediaAuthRequest::MultimediaAuthRequest(const Dictionary* dict,
 std::string MultimediaAuthRequest::sip_auth_scheme() const
 {
   std::string sip_auth_scheme;
-  Diameter::AVP::iterator avps = begin(((Cx::Dictionary*)dict())->SIP_AUTH_DATA_ITEM);
-  if (avps != end())
+  Diameter::AVP::iterator sip_auth_data_item_avp =
+                           begin(((Cx::Dictionary*)dict())->SIP_AUTH_DATA_ITEM);
+  if (sip_auth_data_item_avp != end())
   {
-    Diameter::AVP::iterator avps2 = avps->begin(((Cx::Dictionary*)dict())->SIP_AUTH_SCHEME);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator sip_auth_scheme_avp =
+      sip_auth_data_item_avp->begin(((Cx::Dictionary*)dict())->SIP_AUTH_SCHEME);
+    if (sip_auth_scheme_avp != sip_auth_data_item_avp->end())
     {
-      sip_auth_scheme = avps2->val_str();
+      sip_auth_scheme = sip_auth_scheme_avp->val_str();
       TRC_DEBUG("Got SIP-Auth-Scheme %s", sip_auth_scheme.c_str());
     }
   }
@@ -406,13 +422,15 @@ std::string MultimediaAuthRequest::sip_auth_scheme() const
 std::string MultimediaAuthRequest::sip_authorization() const
 {
   std::string sip_authorization;
-  Diameter::AVP::iterator avps = begin(((Cx::Dictionary*)dict())->SIP_AUTH_DATA_ITEM);
-  if (avps != end())
+  Diameter::AVP::iterator sip_auth_data_item_avp =
+                           begin(((Cx::Dictionary*)dict())->SIP_AUTH_DATA_ITEM);
+  if (sip_auth_data_item_avp != end())
   {
-    Diameter::AVP::iterator avps2 = avps->begin(((Cx::Dictionary*)dict())->SIP_AUTHORIZATION);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator sip_authorization_avp =
+      sip_auth_data_item_avp->begin(((Cx::Dictionary*)dict())->SIP_AUTHORIZATION);
+    if (sip_authorization_avp != sip_auth_data_item_avp->end())
     {
-      sip_authorization = avps2->val_str();
+      sip_authorization = sip_authorization_avp->val_str();
       TRC_DEBUG("Got SIP-Authorization %s", sip_authorization.c_str());
     }
   }
@@ -422,6 +440,8 @@ std::string MultimediaAuthRequest::sip_authorization() const
 MultimediaAuthAnswer::MultimediaAuthAnswer(const Dictionary* dict,
                                            Diameter::Stack* stack,
                                            const int32_t& result_code,
+                                           const uint32_t& vendor_id,
+                                           const int32_t& experimental_result_code,
                                            const std::string& scheme,
                                            const DigestAuthVector& digest_av,
                                            const AKAAuthVector& aka_av) :
@@ -431,9 +451,22 @@ MultimediaAuthAnswer::MultimediaAuthAnswer(const Dictionary* dict,
 
   // This method creates an MAA which is unrealistic for various reasons, but is useful for
   // testing our handlers code, which is currently all it is used for.
-  add(Diameter::AVP(dict->RESULT_CODE).val_i32(result_code));
+  if (result_code)
+  {
+    add(Diameter::AVP(dict->RESULT_CODE).val_i32(result_code));
+  }
+  else
+  {
+    Diameter::AVP experimental_result(dict->EXPERIMENTAL_RESULT);
+    experimental_result.add(Diameter::AVP(dict->EXPERIMENTAL_RESULT_CODE).val_i32(experimental_result_code));
+    experimental_result.add(Diameter::AVP(dict->VENDOR_ID).val_u32(vendor_id));
+    add(experimental_result);
+  }
   Diameter::AVP sip_auth_data_item(dict->SIP_AUTH_DATA_ITEM);
-  sip_auth_data_item.add(Diameter::AVP(dict->SIP_AUTH_SCHEME).val_str(scheme));
+  if (!scheme.empty())
+  {
+    sip_auth_data_item.add(Diameter::AVP(dict->SIP_AUTH_SCHEME).val_str(scheme));
+  }
   Diameter::AVP sip_digest_authenticate(dict->SIP_DIGEST_AUTHENTICATE);
   sip_digest_authenticate.add(Diameter::AVP(dict->CX_DIGEST_HA1).val_str(digest_av.ha1));
   sip_digest_authenticate.add(Diameter::AVP(dict->CX_DIGEST_REALM).val_str(digest_av.realm));
@@ -449,13 +482,15 @@ MultimediaAuthAnswer::MultimediaAuthAnswer(const Dictionary* dict,
 std::string MultimediaAuthAnswer::sip_auth_scheme() const
 {
   std::string sip_auth_scheme;
-  Diameter::AVP::iterator avps = begin(((Cx::Dictionary*)dict())->SIP_AUTH_DATA_ITEM);
-  if (avps != end())
+  Diameter::AVP::iterator sip_auth_data_item_avp =
+                           begin(((Cx::Dictionary*)dict())->SIP_AUTH_DATA_ITEM);
+  if (sip_auth_data_item_avp != end())
   {
-    Diameter::AVP::iterator avps2 = avps->begin(((Cx::Dictionary*)dict())->SIP_AUTH_SCHEME);
-    if (avps != avps2->end())
+    Diameter::AVP::iterator sip_auth_scheme_avp =
+      sip_auth_data_item_avp->begin(((Cx::Dictionary*)dict())->SIP_AUTH_SCHEME);
+    if (sip_auth_scheme_avp != sip_auth_data_item_avp->end())
     {
-      sip_auth_scheme = avps2->val_str();
+      sip_auth_scheme = sip_auth_scheme_avp->val_str();
       TRC_DEBUG("Got SIP-Auth-Scheme %s", sip_auth_scheme.c_str());
     }
   }
@@ -466,61 +501,75 @@ DigestAuthVector MultimediaAuthAnswer::digest_auth_vector() const
 {
   TRC_DEBUG("Getting digest authentication vector from Multimedia-Auth answer");
   DigestAuthVector digest_auth_vector;
-  Diameter::AVP::iterator avps = begin(((Cx::Dictionary*)dict())->SIP_AUTH_DATA_ITEM);
-  if (avps != end())
+  Diameter::AVP::iterator sip_auth_data_item_avp =
+                           begin(((Cx::Dictionary*)dict())->SIP_AUTH_DATA_ITEM);
+  if (sip_auth_data_item_avp != end())
   {
-    Diameter::AVP::iterator avps2 = avps->begin(((Cx::Dictionary*)dict())->SIP_DIGEST_AUTHENTICATE);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator sip_digest_authenticate_avp =
+      sip_auth_data_item_avp->begin(((Cx::Dictionary*)dict())->SIP_DIGEST_AUTHENTICATE);
+    if (sip_digest_authenticate_avp != sip_auth_data_item_avp->end())
     {
       // Look for the digest.
-      Diameter::AVP::iterator avps3 = avps2->begin(((Cx::Dictionary*)dict())->CX_DIGEST_HA1);
-      if (avps3 != avps2->end())
+      Diameter::AVP::iterator digest_ha1_avp =
+        sip_digest_authenticate_avp->begin(((Cx::Dictionary*)dict())->CX_DIGEST_HA1);
+      if (digest_ha1_avp != sip_digest_authenticate_avp->end())
       {
-        digest_auth_vector.ha1 = avps3->val_str();
+        digest_auth_vector.ha1 = digest_ha1_avp->val_str();
         TRC_DEBUG("Found Digest-HA1 %s", digest_auth_vector.ha1.c_str());
       }
       else
       {
-        // Some HSSs (in particular OpenIMSCore), use non-3GPP Digest-HA1.  Check for this too.
-        avps3 = avps2->begin(((Cx::Dictionary*)dict())->DIGEST_HA1);
-        if (avps3 != avps2->end())
+        // Some HSSs (in particular OpenIMSCore), use non-3GPP Digest-HA1.
+        // Check for this too.
+        digest_ha1_avp =
+          sip_digest_authenticate_avp->begin(((Cx::Dictionary*)dict())->DIGEST_HA1);
+        if (digest_ha1_avp != sip_digest_authenticate_avp->end())
         {
-          digest_auth_vector.ha1 = avps3->val_str();
-          TRC_DEBUG("Found (non-3GPP) Digest-HA1 %s", digest_auth_vector.ha1.c_str());
+          digest_auth_vector.ha1 = digest_ha1_avp->val_str();
+          TRC_DEBUG("Found (non-3GPP) Digest-HA1 %s",
+                    digest_auth_vector.ha1.c_str());
         }
       }
       // Look for the realm.
-      avps3 = avps2->begin(((Cx::Dictionary*)dict())->CX_DIGEST_REALM);
-      if (avps3 != avps2->end())
+      Diameter::AVP::iterator digest_realm_avp =
+        sip_digest_authenticate_avp->begin(((Cx::Dictionary*)dict())->CX_DIGEST_REALM);
+      if (digest_realm_avp != sip_digest_authenticate_avp->end())
       {
-        digest_auth_vector.realm = avps3->val_str();
+        digest_auth_vector.realm = digest_realm_avp->val_str();
         TRC_DEBUG("Found Digest-Realm %s", digest_auth_vector.realm.c_str());
       }
       else
       {
-        // Some HSSs (in particular OpenIMSCore), use non-3GPP Digest-Realm.  Check for this too.
-        avps3 = avps2->begin(((Cx::Dictionary*)dict())->DIGEST_REALM);
-        if (avps3 != avps2->end())
+        // Some HSSs (in particular OpenIMSCore), use non-3GPP Digest-Realm.
+        // Check for this too.
+        digest_realm_avp =
+          sip_digest_authenticate_avp->begin(((Cx::Dictionary*)dict())->DIGEST_REALM);
+        if (digest_realm_avp != sip_digest_authenticate_avp->end())
         {
-          digest_auth_vector.realm = avps3->val_str();
-          TRC_DEBUG("Found (non-3GPP) Digest-Realm %s", digest_auth_vector.realm.c_str());
+          digest_auth_vector.realm = digest_realm_avp->val_str();
+          TRC_DEBUG("Found (non-3GPP) Digest-Realm %s",
+                    digest_auth_vector.realm.c_str());
         }
       }
       // Look for the QoP.
-      avps3 = avps2->begin(((Cx::Dictionary*)dict())->CX_DIGEST_QOP);
-      if (avps3 != avps2->end())
+      Diameter::AVP::iterator digest_qop_avp =
+        sip_digest_authenticate_avp->begin(((Cx::Dictionary*)dict())->CX_DIGEST_QOP);
+      if (digest_qop_avp != sip_digest_authenticate_avp->end())
       {
-        digest_auth_vector.qop = avps3->val_str();
+        digest_auth_vector.qop = digest_qop_avp->val_str();
         TRC_DEBUG("Found Digest-QoP %s", digest_auth_vector.qop.c_str());
       }
       else
       {
-        // Some HSSs (in particular OpenIMSCore), use non-3GPP Digest-QoP.  Check for this too.
-        avps3 = avps2->begin(((Cx::Dictionary*)dict())->DIGEST_QOP);
-        if (avps3 != avps2->end())
+        // Some HSSs (in particular OpenIMSCore), use non-3GPP Digest-QoP.
+        // Check for this too.
+        digest_qop_avp =
+          sip_digest_authenticate_avp->begin(((Cx::Dictionary*)dict())->DIGEST_QOP);
+        if (digest_qop_avp != sip_digest_authenticate_avp->end())
         {
-          digest_auth_vector.qop = avps3->val_str();
-          TRC_DEBUG("Found (non-3GPP) Digest-QoP %s", digest_auth_vector.qop.c_str());
+          digest_auth_vector.qop = digest_qop_avp->val_str();
+          TRC_DEBUG("Found (non-3GPP) Digest-QoP %s",
+                    digest_auth_vector.qop.c_str());
         }
       }
     }
@@ -532,77 +581,66 @@ AKAAuthVector MultimediaAuthAnswer::aka_auth_vector() const
 {
   TRC_DEBUG("Getting AKA authentication vector from Multimedia-Auth answer");
   AKAAuthVector aka_auth_vector;
-  Diameter::AVP::iterator avps = begin(((Cx::Dictionary*)dict())->SIP_AUTH_DATA_ITEM);
-  if (avps != end())
+  Diameter::AVP::iterator sip_auth_data_item_avp =
+                           begin(((Cx::Dictionary*)dict())->SIP_AUTH_DATA_ITEM);
+  if (sip_auth_data_item_avp != end())
   {
     // Look for the challenge.
-    Diameter::AVP::iterator avps2 = avps->begin(((Cx::Dictionary*)dict())->SIP_AUTHENTICATE);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator sip_authenticate_avp =
+      sip_auth_data_item_avp->begin(((Cx::Dictionary*)dict())->SIP_AUTHENTICATE);
+    if (sip_authenticate_avp != sip_auth_data_item_avp->end())
     {
       size_t len;
-      const uint8_t* data = avps2->val_os(len);
-      aka_auth_vector.challenge = base64(data, len);
-      TRC_DEBUG("Found SIP-Authenticate (challenge) %s", aka_auth_vector.challenge.c_str());
+      const uint8_t* data = sip_authenticate_avp->val_os(len);
+      aka_auth_vector.challenge = base64_encode(data, len);
+      TRC_DEBUG("Found SIP-Authenticate (challenge) %s",
+                aka_auth_vector.challenge.c_str());
     }
+
     // Look for the response.
-    avps2 = avps->begin(((Cx::Dictionary*)dict())->SIP_AUTHORIZATION);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator sip_authorization_avp =
+      sip_auth_data_item_avp->begin(((Cx::Dictionary*)dict())->SIP_AUTHORIZATION);
+    if (sip_authorization_avp != sip_auth_data_item_avp->end())
     {
       size_t len;
-      const uint8_t* data = avps2->val_os(len);
-      aka_auth_vector.response = hex(data, len);
-      TRC_DEBUG("Found SIP-Authorization (response) %s", aka_auth_vector.response.c_str());
+      const uint8_t* data = sip_authorization_avp->val_os(len);
+      aka_auth_vector.response = Utils::hex(data, len);
+      TRC_DEBUG("Found SIP-Authorization (response) %s",
+                aka_auth_vector.response.c_str());
     }
+
     // Look for the encryption key.
-    avps2 = avps->begin(((Cx::Dictionary*)dict())->CONFIDENTIALITY_KEY);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator confidentiality_key_avp =
+      sip_auth_data_item_avp->begin(((Cx::Dictionary*)dict())->CONFIDENTIALITY_KEY);
+    if (confidentiality_key_avp != sip_auth_data_item_avp->end())
     {
       size_t len;
-      const uint8_t* data = avps2->val_os(len);
-      aka_auth_vector.crypt_key = hex(data, len);
-      TRC_DEBUG("Found Confidentiality-Key %s", aka_auth_vector.crypt_key.c_str());
+      const uint8_t* data = confidentiality_key_avp->val_os(len);
+      aka_auth_vector.crypt_key = Utils::hex(data, len);
+      TRC_DEBUG("Found Confidentiality-Key %s",
+                aka_auth_vector.crypt_key.c_str());
     }
+
     // Look for the integrity key.
-    avps2 = avps->begin(((Cx::Dictionary*)dict())->INTEGRITY_KEY);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator integrity_key_avp =
+      sip_auth_data_item_avp->begin(((Cx::Dictionary*)dict())->INTEGRITY_KEY);
+    if (integrity_key_avp != sip_auth_data_item_avp->end())
     {
       size_t len;
-      const uint8_t* data = avps2->val_os(len);
-      aka_auth_vector.integrity_key = hex(data, len);
-      TRC_DEBUG("Found Integrity-Key %s", aka_auth_vector.integrity_key.c_str());
+      const uint8_t* data = integrity_key_avp->val_os(len);
+      aka_auth_vector.integrity_key = Utils::hex(data, len);
+      TRC_DEBUG("Found Integrity-Key %s",
+                aka_auth_vector.integrity_key.c_str());
     }
   }
   return aka_auth_vector;
 }
 
-std::string MultimediaAuthAnswer::hex(const uint8_t* data, size_t len)
+AKAAuthVector MultimediaAuthAnswer::akav2_auth_vector() const
 {
-  static const char* const hex_lookup = "0123456789abcdef";
-  std::string result;
-  result.reserve(2 * len);
-  for (size_t ii = 0; ii < len; ++ii)
-  {
-    const uint8_t b = data[ii];
-    result.push_back(hex_lookup[b >> 4]);
-    result.push_back(hex_lookup[b & 0x0f]);
-  }
-  return result;
-}
-
-std::string MultimediaAuthAnswer::base64(const uint8_t* data, size_t len)
-{
-  std::stringstream os;
-  std::copy(boost::archive::iterators::base64_from_binary<boost::archive::iterators::transform_width<const uint8_t*,6,8> >(data),
-            boost::archive::iterators::base64_from_binary<boost::archive::iterators::transform_width<const uint8_t*,6,8> >(data + len),
-            boost::archive::iterators::ostream_iterator<char>(os));
-
-  // Properly encoded Base64 should be a multiple of 4 characters long
-  // (with 4 ASCII characters for each 3 bytes). If it is less than
-  // that, add extra equals signs until it's a multiple of 4.
-  std::string base64 = os.str();
-  int extra_equals = ((-1 * base64.length()) % 4);
-  std::string suffix(extra_equals, '=');
-  return base64 + suffix;
+  AKAAuthVector av = aka_auth_vector();
+  av.version = 2;
+  return av;
 }
 
 ServerAssignmentRequest::ServerAssignmentRequest(const Dictionary* dict,
@@ -639,6 +677,8 @@ ServerAssignmentRequest::ServerAssignmentRequest(const Dictionary* dict,
 ServerAssignmentAnswer::ServerAssignmentAnswer(const Dictionary* dict,
                                                Diameter::Stack* stack,
                                                const int32_t& result_code,
+                                               const uint32_t& vendor_id,
+                                               const int32_t& experimental_result_code,
                                                const std::string& ims_subscription,
                                                const ChargingAddresses& charging_addrs) :
                                                Diameter::Message(dict, dict->SERVER_ASSIGNMENT_ANSWER, stack)
@@ -647,8 +687,20 @@ ServerAssignmentAnswer::ServerAssignmentAnswer(const Dictionary* dict,
 
   // This method creates an SAA which is unrealistic for various reasons, but is useful for
   // testing our handlers code, which is currently all it is used for.
-  add(Diameter::AVP(dict->RESULT_CODE).val_i32(result_code));
+  if (result_code)
+  {
+    add(Diameter::AVP(dict->RESULT_CODE).val_i32(result_code));
+  }
+  else
+  {
+    Diameter::AVP experimental_result(dict->EXPERIMENTAL_RESULT);
+    experimental_result.add(Diameter::AVP(dict->EXPERIMENTAL_RESULT_CODE).val_i32(experimental_result_code));
+    experimental_result.add(Diameter::AVP(dict->VENDOR_ID).val_u32(vendor_id));
+    add(experimental_result);
+  }
+
   add(Diameter::AVP(dict->USER_DATA).val_str(ims_subscription));
+
   if (!charging_addrs.empty())
   {
     Diameter::AVP charging_information(dict->CHARGING_INFORMATION);
@@ -682,37 +734,44 @@ ServerAssignmentAnswer::ServerAssignmentAnswer(const Dictionary* dict,
 
 void ServerAssignmentAnswer::charging_addrs(ChargingAddresses& charging_addrs) const
 {
-
-  Diameter::AVP::iterator avps = begin(((Cx::Dictionary*)dict())->CHARGING_INFORMATION);
-  if (avps != end())
+  Diameter::AVP::iterator charging_information_avp =
+                         begin(((Cx::Dictionary*)dict())->CHARGING_INFORMATION);
+  if (charging_information_avp != end())
   {
-    Diameter::AVP::iterator avps2 =
-      avps->begin(((Cx::Dictionary*)dict())->PRIMARY_CHARGING_COLLECTION_FUNCTION_NAME);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator primary_ccf_name_avp =
+      charging_information_avp->begin(((Cx::Dictionary*)dict())->PRIMARY_CHARGING_COLLECTION_FUNCTION_NAME);
+    if (primary_ccf_name_avp != charging_information_avp->end())
     {
-      charging_addrs.ccfs.push_back(avps2->val_str());
-      TRC_DEBUG("Found Primary-Charging-Collection-Function-Name %s", avps2->val_str().c_str());
+      charging_addrs.ccfs.push_back(primary_ccf_name_avp->val_str());
+      TRC_DEBUG("Found Primary-Charging-Collection-Function-Name %s",
+                primary_ccf_name_avp->val_str().c_str());
     }
 
-    avps2 = avps->begin(((Cx::Dictionary*)dict())->SECONDARY_CHARGING_COLLECTION_FUNCTION_NAME);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator secondary_ccf_name_avp =
+      charging_information_avp->begin(((Cx::Dictionary*)dict())->SECONDARY_CHARGING_COLLECTION_FUNCTION_NAME);
+    if (secondary_ccf_name_avp != charging_information_avp->end())
     {
-      charging_addrs.ccfs.push_back(avps2->val_str());
-      TRC_DEBUG("Found Secondary-Charging-Collection-Function-Name %s", avps2->val_str().c_str());
+      charging_addrs.ccfs.push_back(secondary_ccf_name_avp->val_str());
+      TRC_DEBUG("Found Secondary-Charging-Collection-Function-Name %s",
+                secondary_ccf_name_avp->val_str().c_str());
     }
 
-    avps2 = avps->begin(((Cx::Dictionary*)dict())->PRIMARY_EVENT_CHARGING_FUNCTION_NAME);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator primary_ecf_name_avp =
+      charging_information_avp->begin(((Cx::Dictionary*)dict())->PRIMARY_EVENT_CHARGING_FUNCTION_NAME);
+    if (primary_ecf_name_avp != charging_information_avp->end())
     {
-      charging_addrs.ecfs.push_back(avps2->val_str());
-      TRC_DEBUG("Found Primary-Event-Charging-Function-Name %s", avps2->val_str().c_str());
+      charging_addrs.ecfs.push_back(primary_ecf_name_avp->val_str());
+      TRC_DEBUG("Found Primary-Event-Charging-Function-Name %s",
+                primary_ecf_name_avp->val_str().c_str());
     }
 
-    avps2 = avps->begin(((Cx::Dictionary*)dict())->SECONDARY_EVENT_CHARGING_FUNCTION_NAME);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator secondary_ecf_name_avp =
+      charging_information_avp->begin(((Cx::Dictionary*)dict())->SECONDARY_EVENT_CHARGING_FUNCTION_NAME);
+    if (secondary_ecf_name_avp != charging_information_avp->end())
     {
-      charging_addrs.ecfs.push_back(avps2->val_str());
-      TRC_DEBUG("Found Secondary-Event-Charging-Function-Name %s", avps2->val_str().c_str());
+      charging_addrs.ecfs.push_back(secondary_ecf_name_avp->val_str());
+      TRC_DEBUG("Found Secondary-Event-Charging-Function-Name %s",
+                secondary_ecf_name_avp->val_str().c_str());
     }
   }
 }
@@ -762,15 +821,17 @@ std::vector<std::string> RegistrationTerminationRequest::associated_identities()
 
   // Associated Identities are found in USER_NAME AVPS inside the ASSOCIATED_IDENTITIES AVP.
   TRC_DEBUG("Getting Associated-Identities from Registration-Termination request");
-  Diameter::AVP::iterator avps = begin(((Cx::Dictionary*)dict())->ASSOCIATED_IDENTITIES);
-  if (avps != end())
+  Diameter::AVP::iterator associated_identities_avp =
+                        begin(((Cx::Dictionary*)dict())->ASSOCIATED_IDENTITIES);
+  if (associated_identities_avp != end())
   {
-    Diameter::AVP::iterator avps2 = avps->begin(dict()->USER_NAME);
-    while (avps2 != avps->end())
+    Diameter::AVP::iterator user_name_avp =
+                            associated_identities_avp->begin(dict()->USER_NAME);
+    while (user_name_avp != associated_identities_avp->end())
     {
-      TRC_DEBUG("Found User-Name %s", avps2->val_str().c_str());
-      associated_identities.push_back(avps2->val_str());
-      avps2++;
+      TRC_DEBUG("Found User-Name %s", user_name_avp->val_str().c_str());
+      associated_identities.push_back(user_name_avp->val_str());
+      user_name_avp++;
     }
   }
   return associated_identities;
@@ -782,12 +843,14 @@ std::vector<std::string> RegistrationTerminationRequest::impus() const
 
   // Find all the PUBLIC_IDENTITY AVPS.
   TRC_DEBUG("Getting Public-Identities from Registration-Termination request");
-  Diameter::AVP::iterator avps = begin(((Cx::Dictionary*)dict())->PUBLIC_IDENTITY);
-  while (avps != end())
+  Diameter::AVP::iterator public_identity_avps =
+                              begin(((Cx::Dictionary*)dict())->PUBLIC_IDENTITY);
+  while (public_identity_avps != end())
   {
-    TRC_DEBUG("Found Public-Identity %s", avps->val_str().c_str());
-    impus.push_back(avps->val_str());
-    avps++;
+    TRC_DEBUG("Found Public-Identity %s",
+              public_identity_avps->val_str().c_str());
+    impus.push_back(public_identity_avps->val_str());
+    public_identity_avps++;
   }
   return impus;
 }
@@ -795,13 +858,15 @@ std::vector<std::string> RegistrationTerminationRequest::impus() const
 int32_t RegistrationTerminationRequest::deregistration_reason() const
 {
   int32_t deregistration_reason = 0;
-  Diameter::AVP::iterator avps = begin(((Cx::Dictionary*)dict())->DEREGISTRATION_REASON);
-  if (avps != end())
+  Diameter::AVP::iterator dereg_reason_avp =
+                        begin(((Cx::Dictionary*)dict())->DEREGISTRATION_REASON);
+  if (dereg_reason_avp != end())
   {
-    Diameter::AVP::iterator avps2 = avps->begin(((Cx::Dictionary*)dict())->REASON_CODE);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator reason_code_avp =
+                dereg_reason_avp->begin(((Cx::Dictionary*)dict())->REASON_CODE);
+    if (reason_code_avp != dereg_reason_avp->end())
     {
-      deregistration_reason = avps2->val_i32();
+      deregistration_reason = reason_code_avp->val_i32();
       TRC_DEBUG("Got Deregistration Reason-Code %d", deregistration_reason);
     }
   }
@@ -840,17 +905,20 @@ std::vector<std::string> RegistrationTerminationAnswer::associated_identities() 
 {
   std::vector<std::string> associated_identities;
 
-  // Associated Identities are found in USER_NAME AVPS inside the ASSOCIATED_IDENTITIES AVP.
+  // Associated Identities are found in USER_NAME AVPS inside the
+  // ASSOCIATED_IDENTITIES AVP.
   TRC_DEBUG("Getting Associated-Identities from Registration-Termination answer");
-  Diameter::AVP::iterator avps = begin(((Cx::Dictionary*)dict())->ASSOCIATED_IDENTITIES);
-  if (avps != end())
+  Diameter::AVP::iterator associated_identities_avp =
+                        begin(((Cx::Dictionary*)dict())->ASSOCIATED_IDENTITIES);
+  if (associated_identities_avp != end())
   {
-    Diameter::AVP::iterator avps2 = avps->begin(dict()->USER_NAME);
-    while (avps2 != avps->end())
+    Diameter::AVP::iterator user_name_avp =
+                            associated_identities_avp->begin(dict()->USER_NAME);
+    while (user_name_avp != associated_identities_avp->end())
     {
-      TRC_DEBUG("Found User-Name %s", avps2->val_str().c_str());
-      associated_identities.push_back(avps2->val_str());
-      avps2++;
+      TRC_DEBUG("Found User-Name %s", user_name_avp->val_str().c_str());
+      associated_identities.push_back(user_name_avp->val_str());
+      user_name_avp++;
     }
   }
   return associated_identities;
@@ -908,38 +976,46 @@ bool PushProfileRequest::charging_addrs(ChargingAddresses& charging_addrs) const
 {
   bool found_charging_info = false;
 
-  Diameter::AVP::iterator avps = begin(((Cx::Dictionary*)dict())->CHARGING_INFORMATION);
-  if (avps != end())
+  Diameter::AVP::iterator charging_information_avp =
+                         begin(((Cx::Dictionary*)dict())->CHARGING_INFORMATION);
+  if (charging_information_avp != end())
   {
     found_charging_info = true;
 
-    Diameter::AVP::iterator avps2 =
-      avps->begin(((Cx::Dictionary*)dict())->PRIMARY_CHARGING_COLLECTION_FUNCTION_NAME);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator primary_ccf_name_avp =
+      charging_information_avp->begin(((Cx::Dictionary*)dict())->PRIMARY_CHARGING_COLLECTION_FUNCTION_NAME);
+    if (primary_ccf_name_avp != charging_information_avp->end())
     {
-      charging_addrs.ccfs.push_back(avps2->val_str());
-      TRC_DEBUG("Found Primary-Charging-Collection-Function-Name %s", avps2->val_str().c_str());
+      charging_addrs.ccfs.push_back(primary_ccf_name_avp->val_str());
+      TRC_DEBUG("Found Primary-Charging-Collection-Function-Name %s",
+                primary_ccf_name_avp->val_str().c_str());
     }
 
-    avps2 = avps->begin(((Cx::Dictionary*)dict())->SECONDARY_CHARGING_COLLECTION_FUNCTION_NAME);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator secondary_ccf_name_avp =
+      charging_information_avp->begin(((Cx::Dictionary*)dict())->SECONDARY_CHARGING_COLLECTION_FUNCTION_NAME);
+    if (secondary_ccf_name_avp != charging_information_avp->end())
     {
-      charging_addrs.ccfs.push_back(avps2->val_str());
-      TRC_DEBUG("Found Secondary-Charging-Collection-Function-Name %s", avps2->val_str().c_str());
+      charging_addrs.ccfs.push_back(secondary_ccf_name_avp->val_str());
+      TRC_DEBUG("Found Secondary-Charging-Collection-Function-Name %s",
+                secondary_ccf_name_avp->val_str().c_str());
     }
 
-    avps2 = avps->begin(((Cx::Dictionary*)dict())->PRIMARY_EVENT_CHARGING_FUNCTION_NAME);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator primary_ecf_name_avp =
+      charging_information_avp->begin(((Cx::Dictionary*)dict())->PRIMARY_EVENT_CHARGING_FUNCTION_NAME);
+    if (primary_ecf_name_avp != charging_information_avp->end())
     {
-      charging_addrs.ecfs.push_back(avps2->val_str());
-      TRC_DEBUG("Found Primary-Event-Charging-Function-Name %s", avps2->val_str().c_str());
+      charging_addrs.ecfs.push_back(primary_ecf_name_avp->val_str());
+      TRC_DEBUG("Found Primary-Event-Charging-Function-Name %s",
+                primary_ecf_name_avp->val_str().c_str());
     }
 
-    avps2 = avps->begin(((Cx::Dictionary*)dict())->SECONDARY_EVENT_CHARGING_FUNCTION_NAME);
-    if (avps2 != avps->end())
+    Diameter::AVP::iterator secondary_ecf_name_avp =
+      charging_information_avp->begin(((Cx::Dictionary*)dict())->SECONDARY_EVENT_CHARGING_FUNCTION_NAME);
+    if (secondary_ecf_name_avp != charging_information_avp->end())
     {
-      charging_addrs.ecfs.push_back(avps2->val_str());
-      TRC_DEBUG("Found Secondary-Event-Charging-Function-Name %s", avps2->val_str().c_str());
+      charging_addrs.ecfs.push_back(secondary_ecf_name_avp->val_str());
+      TRC_DEBUG("Found Secondary-Event-Charging-Function-Name %s",
+                secondary_ecf_name_avp->val_str().c_str());
     }
   }
   return found_charging_info;
