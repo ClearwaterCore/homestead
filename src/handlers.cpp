@@ -339,6 +339,9 @@ void ImpiTask::on_mar_response(Diameter::Message& rsp)
   _maa = new Cx::MultimediaAuthAnswer(rsp);
   int32_t result_code = 0;
   _maa->result_code(result_code);
+  // IMS mandates that exactly one of result code or experimental result code
+  // will be set, so we can unambiguously assume that, if one is set, then the
+  // other one won't be.
   mar_results_tbl->increment(SNMP::DiameterAppId::BASE, result_code);
   TRC_DEBUG("Received Multimedia-Auth answer with result code %d", result_code);
 
@@ -635,6 +638,10 @@ void ImpiRegistrationStatusTask::on_uar_response(Diameter::Message& rsp)
   int32_t result_code = 0;
   uaa.result_code(result_code);
   int32_t experimental_result_code = uaa.experimental_result_code();
+
+  // IMS mandates that exactly one of result code or experimental result code
+  // will be set, so we can unambiguously assume that, if one is set, then the
+  // other one won't be.
   if (result_code != 0)
   {
     uar_results_tbl->increment(SNMP::DiameterAppId::BASE, result_code);
@@ -781,6 +788,10 @@ void ImpuLocationInfoTask::on_lir_response(Diameter::Message& rsp)
   int32_t result_code = 0;
   lia.result_code(result_code);
   int32_t experimental_result_code = lia.experimental_result_code();
+
+  // IMS mandates that exactly one of result code or experimental result code
+  // will be set, so we can unambiguously assume that, if one is set, then the
+  // other one won't be.
   if (result_code != 0)
   {
     lir_results_tbl->increment(SNMP::DiameterAppId::BASE, result_code);
@@ -1678,6 +1689,9 @@ void ImpuRegDataTask::on_sar_response(Diameter::Message& rsp)
   int32_t result_code = 0;
   saa.result_code(result_code);
   int32_t experimental_result_code = saa.experimental_result_code();
+  // IMS mandates that exactly one of result code or experimental result code
+  // will be set, so we can unambiguously assume that, if one is set, then the
+  // other one won't be.
   sar_results_tbl->increment(SNMP::DiameterAppId::BASE, result_code);
   TRC_DEBUG("Received Server-Assignment answer with result code %d and experimental result code %d", result_code, experimental_result_code);
 
