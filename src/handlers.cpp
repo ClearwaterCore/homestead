@@ -399,6 +399,10 @@ void ImpiTask::on_mar_response(Diameter::Message& rsp)
     }
     else
     {
+      TRC_DEBUG("Unsupported auth scheme: %s", sip_auth_scheme.c_str());
+      SAS::Event event(this->trail(), SASEvent::UNSUPPORTED_SCHEME, 0);
+      event.add_var_param(sip_auth_scheme);
+      SAS::report_event(event);
       send_http_reply(HTTP_NOT_FOUND);
     }
   }
@@ -1714,7 +1718,7 @@ void ImpuRegDataTask::on_put_reg_data_failure(CassandraStore::Operation* op, Cas
   SAS::report_event(event);
 
   // Failed to cache Reg Data.  Return an error in the hope that the client might try again
-  send_http_reply(HTTP_SERVER_ERROR);
+  send_http_reply(HTTP_SERVER_UNAVAILABLE);
 
   delete this;
 }
@@ -1870,13 +1874,13 @@ void ImpuRegDataTask::on_del_impu_failure(CassandraStore::Operation* op, Cassand
   }
   else
   {
-    // Not benign.  Return the original error if it wasn't OK - otherwise reply with SERVER ERROR
+    // Not benign.  Return the original error if it wasn't OK
     SAS::Event event(this->trail(), SASEvent::CACHE_DELETE_IMPUS_FAIL, 0);
     event.add_static_param(error);
     event.add_var_param(text);
     SAS::report_event(event);
 
-    send_http_reply((_http_rc == HTTP_OK) ? HTTP_SERVER_ERROR : _http_rc);
+    send_http_reply((_http_rc == HTTP_OK) ? HTTP_SERVER_UNAVAILABLE : _http_rc);
     delete this;
   }
 }
