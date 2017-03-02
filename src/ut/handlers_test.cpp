@@ -3042,7 +3042,7 @@ TEST_F(HandlersTest, IMSSubscriptionCacheFailure)
   // subscription information for the specified public ID.
   MockCache::MockGetRegData mock_op;
   EXPECT_CALL(*_cache, create_GetRegData(IMPU))
-     .WillOnce(Return(&mock_op));
+    .WillOnce(Return(&mock_op));
   EXPECT_DO_ASYNC(*_cache, mock_op);
 
   task->run();
