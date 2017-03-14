@@ -94,6 +94,10 @@ Dictionary::Dictionary() :
   SECONDARY_CHARGING_COLLECTION_FUNCTION_NAME("3GPP", "Secondary-Charging-Collection-Function-Name"),
   PRIMARY_EVENT_CHARGING_FUNCTION_NAME("3GPP", "Primary-Event-Charging-Function-Name"),
   SECONDARY_EVENT_CHARGING_FUNCTION_NAME("3GPP", "Secondary-Event-Charging-Function-Name")
+  SUPPORTED_FEATURES("3GPP", "Supported-Features"),
+  VENDOR_ID("3GPP", "Vendor-Id"),
+  FEATURE_LIST_ID("3GPP", "Feature-List-ID"),
+  FEATURE_LIST("3GPP", "Feature-List")
 {
 }
 
@@ -672,6 +676,11 @@ ServerAssignmentRequest::ServerAssignmentRequest(const Dictionary* dict,
   add(Diameter::AVP(dict->SERVER_NAME).val_str(server_name));
   add(Diameter::AVP(dict->SERVER_ASSIGNMENT_TYPE).val_i32(type));
   add(Diameter::AVP(dict->USER_DATA_ALREADY_AVAILABLE).val_i32(0));
+  Diameter::AVP supported_features(dict->SUPPORTED_FEATURES);
+  supported_features.add(Diameter::AVP(dict->VENDOR_ID).val_u32(10415));
+  supported_features.add(Diameter::AVP(dict->FEATURE_LIST_ID).val_u32(1));
+  supported_features.add(Diameter::AVP(dict->FEATURE_LIST).val_u32(1));
+  add(supported_features);
 }
 
 ServerAssignmentAnswer::ServerAssignmentAnswer(const Dictionary* dict,
