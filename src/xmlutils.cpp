@@ -97,9 +97,9 @@ int build_ClearwaterRegData_xml(RegistrationState state,
     try
     {
       prev_doc.parse<rapidxml::parse_strip_xml_namespaces>(user_data_str);
-  
+
       if (prev_doc.first_node("IMSSubscription"))
-      {      
+      {
         is = doc.clone_node(prev_doc.first_node("IMSSubscription"));
       }
       else
@@ -172,7 +172,19 @@ int build_ClearwaterRegData_xml(RegistrationState state,
 // Parses the given User-Data XML to retrieve a list of all the public IDs.
 std::vector<std::string> get_public_ids(const std::string& user_data)
 {
+  // Call into the function which parses out both the default id and the public
+  // IDs with a dummy default id that will not be returned.
+  std::string default_id;
+  return get_public_and_dummy_ids(user_data, default_id);
+}
+
+// Parses the given User-Data XML to retrieve a lit of all the public IDs, and
+// the default id (the first unbarred public ID).
+std::vector<std::string> get_public_and_default_ids(const std::string& user_data,
+                                                    std::string& default_id)
+{
   std::vector<std::string> public_ids;
+  std::vector<std::string> unbarred_public_ids;
 
   // Parse the XML document, saving off the passed-in string first (as parsing
   // is destructive).
@@ -206,9 +218,20 @@ std::vector<std::string> get_public_ids(const std::string& user_data)
            pi = pi->next_sibling("PublicIdentity"))
       {
         rapidxml::xml_node<>* id = pi->first_node("Identity");
+        std::string barring_value = RegDataXMLUtils::STATE_UNBARRED;
+        rapidxml::xml_node<>* barring_indication = pi->first_node(RegDataXMLUtils::BARRING_INDICATION);
+        if (barring_indication)
+        {
+          barring_value = barring_indication->value();
+        }
+
         if (id)
         {
           public_ids.push_back((std::string)id->value());
+          if (barring_value == RegDataXMLUtils::STATE_UNBARRED)
+          {
+            unbarred_public_ids.push_back(uri);
+          }
         }
         else
         {
@@ -222,6 +245,13 @@ std::vector<std::string> get_public_ids(const std::string& user_data)
   {
     TRC_ERROR("Failed to extract any ServiceProfile/PublicIdentity/Identity nodes from %s", user_data.c_str());
   }
+
+  // Set the default id - this is the first unbarred public identity.
+  if (unbarred_public_ids.size() != 0)
+  {
+    default_id = unbarred_public_ids.front();
+  }
+
   return public_ids;
 }
 
