@@ -35,6 +35,7 @@
  */
 
 #include "xmlutils.h"
+#include "xml_utils.h"
 
 #include "log.h"
 
@@ -175,7 +176,7 @@ std::vector<std::string> get_public_ids(const std::string& user_data)
   // Call into the function which parses out both the default id and the public
   // IDs with a dummy default id that will not be returned.
   std::string default_id;
-  return get_public_and_dummy_ids(user_data, default_id);
+  return get_public_and_default_ids(user_data, default_id);
 }
 
 // Parses the given User-Data XML to retrieve a lit of all the public IDs, and
@@ -230,7 +231,7 @@ std::vector<std::string> get_public_and_default_ids(const std::string& user_data
           public_ids.push_back((std::string)id->value());
           if (barring_value == RegDataXMLUtils::STATE_UNBARRED)
           {
-            unbarred_public_ids.push_back(uri);
+            unbarred_public_ids.push_back((std::string)id->value());
           }
         }
         else
