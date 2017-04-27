@@ -35,7 +35,6 @@
  */
 
 #include "xmlutils.h"
-#include "xml_utils.h"
 
 #include "log.h"
 
