@@ -219,8 +219,8 @@ std::vector<std::string> get_public_and_default_ids(const std::string& user_data
            pi = pi->next_sibling("PublicIdentity"))
       {
         rapidxml::xml_node<>* id = pi->first_node("Identity");
-        std::string barring_value = RegDataXMLUtils::STATE_UNBARRED;
-        rapidxml::xml_node<>* barring_indication = pi->first_node(RegDataXMLUtils::BARRING_INDICATION);
+        std::string barring_value = "0";
+        rapidxml::xml_node<>* barring_indication = pi->first_node("BarringIndication");
         if (barring_indication)
         {
           barring_value = barring_indication->value();
@@ -229,7 +229,7 @@ std::vector<std::string> get_public_and_default_ids(const std::string& user_data
         if (id)
         {
           public_ids.push_back((std::string)id->value());
-          if (barring_value == RegDataXMLUtils::STATE_UNBARRED)
+          if (barring_value == "0")
           {
             unbarred_public_ids.push_back((std::string)id->value());
           }
