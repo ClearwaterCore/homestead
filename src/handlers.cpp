@@ -1564,7 +1564,8 @@ void ImpuRegDataTask::send_server_assignment_request(Cx::ServerAssignmentType ty
                                   _impu,
                                   (_provided_server_name == "" ? _configured_server_name :
                                    _provided_server_name),
-                                  type);
+                                  type,
+                                  _cfg->support_shared_ifcs);
   DiameterTransaction* tsx =
     new DiameterTransaction(_dict,
                             this,
