@@ -272,7 +272,9 @@ public:
                           const std::string& impi,
                           const std::string& impu,
                           const std::string& server_name,
-                          const Cx::ServerAssignmentType type);
+                          const Cx::ServerAssignmentType type,
+                          const bool support_shared_ifcs);
+
   inline ServerAssignmentRequest(Diameter::Message& msg) : Diameter::Message(msg) {};
 
   inline std::string impu() const
