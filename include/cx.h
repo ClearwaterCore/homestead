@@ -94,6 +94,10 @@ public:
   const Diameter::Dictionary::AVP SECONDARY_CHARGING_COLLECTION_FUNCTION_NAME;
   const Diameter::Dictionary::AVP PRIMARY_EVENT_CHARGING_FUNCTION_NAME;
   const Diameter::Dictionary::AVP SECONDARY_EVENT_CHARGING_FUNCTION_NAME;
+  const Diameter::Dictionary::AVP SUPPORTED_FEATURES;
+  const Diameter::Dictionary::AVP VENDOR_ID;
+  const Diameter::Dictionary::AVP FEATURE_LIST_ID;
+  const Diameter::Dictionary::AVP FEATURE_LIST;
 };
 
 class UserAuthorizationRequest : public Diameter::Message
@@ -268,7 +272,9 @@ public:
                           const std::string& impi,
                           const std::string& impu,
                           const std::string& server_name,
-                          const Cx::ServerAssignmentType type);
+                          const Cx::ServerAssignmentType type,
+                          const bool support_shared_ifcs);
+
   inline ServerAssignmentRequest(Diameter::Message& msg) : Diameter::Message(msg) {};
 
   inline std::string impu() const

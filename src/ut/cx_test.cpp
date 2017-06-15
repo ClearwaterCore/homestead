@@ -369,7 +369,8 @@ TEST_F(CxTest, SARTest)
                                   IMPI,
                                   IMPU,
                                   SERVER_NAME,
-                                  TIMEOUT_DEREGISTRATION);
+                                  TIMEOUT_DEREGISTRATION,
+                                  true);
   launder_message(sar);
   check_common_request_fields(sar);
   EXPECT_EQ(IMPI, sar.impi());
@@ -380,6 +381,18 @@ TEST_F(CxTest, SARTest)
   EXPECT_EQ(TIMEOUT_DEREGISTRATION, test_i32);
   EXPECT_TRUE(sar.user_data_already_available(test_i32));
   EXPECT_EQ(0, test_i32);
+
+  Diameter::AVP::iterator supported_feature_avp = sar.begin(((Cx::Dictionary*)sar.dict())->SUPPORTED_FEATURES);
+  EXPECT_NE(supported_feature_avp, sar.end());
+  Diameter::AVP::iterator feature_list_id_avp = supported_feature_avp->begin(((Cx::Dictionary*)sar.dict())->FEATURE_LIST_ID);
+  EXPECT_NE(feature_list_id_avp, supported_feature_avp->end());
+  EXPECT_EQ(1, feature_list_id_avp->val_i32());
+  Diameter::AVP::iterator feature_list_avp = supported_feature_avp->begin(((Cx::Dictionary*)sar.dict())->FEATURE_LIST);
+  EXPECT_NE(feature_list_avp, supported_feature_avp->end());
+  EXPECT_EQ(1, feature_list_avp->val_i32());
+  Diameter::AVP::iterator vendor_id_avp = supported_feature_avp->begin(((Cx::Dictionary*)sar.dict())->VENDOR_ID);
+  EXPECT_NE(vendor_id_avp, supported_feature_avp->end());
+  EXPECT_EQ(10415, vendor_id_avp->val_i32());
 }
 
 TEST_F(CxTest, SARNoImpiTest)
@@ -391,7 +404,8 @@ TEST_F(CxTest, SARNoImpiTest)
                                   EMPTY_STRING,
                                   IMPU,
                                   SERVER_NAME,
-                                  UNREGISTERED_USER);
+                                  UNREGISTERED_USER,
+                                  true);
   launder_message(sar);
   check_common_request_fields(sar);
   EXPECT_EQ(EMPTY_STRING, sar.impi());
@@ -402,6 +416,26 @@ TEST_F(CxTest, SARNoImpiTest)
   EXPECT_EQ(UNREGISTERED_USER, test_i32);
   EXPECT_TRUE(sar.user_data_already_available(test_i32));
   EXPECT_EQ(0, test_i32);
+}
+
+// Test that if we don't support shared IFCs, we don't add a Supported-Features
+// AVP claiming we do
+TEST_F(CxTest, SARTestNoSharedIFCSupport)
+{
+  Cx::ServerAssignmentRequest sar(_cx_dict,
+                                  _mock_stack,
+                                  DEST_HOST,
+                                  DEST_REALM,
+                                  IMPI,
+                                  IMPU,
+                                  SERVER_NAME,
+                                  TIMEOUT_DEREGISTRATION,
+                                  false);
+  launder_message(sar);
+  check_common_request_fields(sar);
+
+  Diameter::AVP::iterator supported_feature_avp = sar.begin(((Cx::Dictionary*)sar.dict())->SUPPORTED_FEATURES);
+  EXPECT_EQ(supported_feature_avp, sar.end());
 }
 
 //

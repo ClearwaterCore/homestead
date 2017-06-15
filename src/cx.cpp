@@ -93,7 +93,11 @@ Dictionary::Dictionary() :
   PRIMARY_CHARGING_COLLECTION_FUNCTION_NAME("3GPP", "Primary-Charging-Collection-Function-Name"),
   SECONDARY_CHARGING_COLLECTION_FUNCTION_NAME("3GPP", "Secondary-Charging-Collection-Function-Name"),
   PRIMARY_EVENT_CHARGING_FUNCTION_NAME("3GPP", "Primary-Event-Charging-Function-Name"),
-  SECONDARY_EVENT_CHARGING_FUNCTION_NAME("3GPP", "Secondary-Event-Charging-Function-Name")
+  SECONDARY_EVENT_CHARGING_FUNCTION_NAME("3GPP", "Secondary-Event-Charging-Function-Name"),
+  SUPPORTED_FEATURES("3GPP", "Supported-Features"),
+  VENDOR_ID("Vendor-Id"),
+  FEATURE_LIST_ID("3GPP", "Feature-List-ID"),
+  FEATURE_LIST("3GPP", "Feature-List")
 {
 }
 
@@ -650,7 +654,8 @@ ServerAssignmentRequest::ServerAssignmentRequest(const Dictionary* dict,
                                                  const std::string& impi,
                                                  const std::string& impu,
                                                  const std::string& server_name,
-                                                 const Cx::ServerAssignmentType type) :
+                                                 const Cx::ServerAssignmentType type,
+                                                 const bool support_shared_ifcs) :
                                                  Diameter::Message(dict, dict->SERVER_ASSIGNMENT_REQUEST, stack)
 {
   TRC_DEBUG("Building Server-Assignment request for %s/%s", impi.c_str(), impu.c_str());
@@ -658,20 +663,33 @@ ServerAssignmentRequest::ServerAssignmentRequest(const Dictionary* dict,
   add_app_id(Diameter::Dictionary::Application::AUTH, dict->TGPP, dict->CX);
   add(Diameter::AVP(dict->AUTH_SESSION_STATE).val_i32(1));
   add_origin();
+
   if (!dest_host.empty())
   {
     add(Diameter::AVP(dict->DESTINATION_HOST).val_str(dest_host));
   }
+
   add(Diameter::AVP(dict->DESTINATION_REALM).val_str(dest_realm));
+
   if (!impi.empty())
   {
     TRC_DEBUG("Specifying User-Name %s", impi.c_str());
     add(Diameter::AVP(dict->USER_NAME).val_str(impi));
   }
+
   add(Diameter::AVP(dict->PUBLIC_IDENTITY).val_str(impu));
   add(Diameter::AVP(dict->SERVER_NAME).val_str(server_name));
   add(Diameter::AVP(dict->SERVER_ASSIGNMENT_TYPE).val_i32(type));
   add(Diameter::AVP(dict->USER_DATA_ALREADY_AVAILABLE).val_i32(0));
+
+  if (support_shared_ifcs)
+  {
+    Diameter::AVP supported_features(dict->SUPPORTED_FEATURES);
+    supported_features.add(Diameter::AVP(dict->VENDOR_ID).val_u32(10415));
+    supported_features.add(Diameter::AVP(dict->FEATURE_LIST_ID).val_u32(1));
+    supported_features.add(Diameter::AVP(dict->FEATURE_LIST).val_u32(1));
+    add(supported_features);
+  }
 }
 
 ServerAssignmentAnswer::ServerAssignmentAnswer(const Dictionary* dict,
