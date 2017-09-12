@@ -145,6 +145,36 @@ static void sas_log_get_reg_data_success(Cache::GetRegData* get_reg_data, SAS::T
   SAS::report_event(event);
 }
 
+void log_sip_all_register_marker(SAS::TrailId trail, const std::string uri)
+{
+  std::string stripped_uri;
+
+  // Strip the scheme off the URI. We expect the scheme to be present, but
+  // cope with the case where it isn't.
+  stripped_uri = Utils::strip_uri_scheme(uri);
+
+  // Extract the user part from the remaining URI.
+  std::string user(stripped_uri);
+  size_t at = user.find('@');
+
+  if (at != std::string::npos)
+  {
+    user.erase(at, std::string::npos);
+  }
+
+  // Log the marker with the stripped URI as the first parameter, and the
+  // DN (if the URI can be interpreted as such) as the second parameter.
+  SAS::Marker sip_all_register(trail, MARKER_ID_SIP_ALL_REGISTER, 1u);
+  sip_all_register.add_var_param(stripped_uri);
+
+  if (Utils::is_user_numeric(user))
+  {
+    sip_all_register.add_var_param(Utils::remove_visual_separators(user));
+  }
+
+  SAS::report_marker(sip_all_register);
+}
+
 // General IMPI handling.
 
 void ImpiTask::run()
@@ -2172,7 +2202,7 @@ void RegistrationTerminationTask::delete_registrations()
     std::string default_impu = (*i)[0];
 
     // Log IMPUs to SAS as SIP_ALL_REGISTER markers so this RTR shows up in search results for the IMPU.
-    log_sip_all_register_marker(default_impu);
+    log_sip_all_register_marker(trail(), default_impu);
 
     default_public_identities.push_back(default_impu);
   }
@@ -2328,36 +2358,6 @@ void RegistrationTerminationTask::send_rta(const std::string result_code)
   rta.send(trail());
 }
 
-void RegistrationTerminationTask::log_sip_all_register_marker(const std::string uri)
-{
-  std::string stripped_uri;
-
-  // Strip the scheme off the URI. We expect the scheme to be present, but
-  // cope with the case where it isn't.
-  stripped_uri = Utils::strip_uri_scheme(uri);
-
-  // Extract the user part from the remaining URI.
-  std::string user(stripped_uri);
-  size_t at = user.find('@');
-
-  if (at != std::string::npos)
-  {
-    user.erase(at, std::string::npos);
-  }
-
-  // Log the marker with the stripped URI as the first parameter, and the
-  // DN (if the URI can be interpreted as such) as the second parameter.
-  SAS::Marker sip_all_register(trail(), MARKER_ID_SIP_ALL_REGISTER, 1u);
-  sip_all_register.add_var_param(stripped_uri);
-
-  if (Utils::is_user_numeric(user))
-  {
-    sip_all_register.add_var_param(Utils::remove_visual_separators(user));
-  }
-
-  SAS::report_marker(sip_all_register);
-}
-
 void PushProfileTask::run()
 {
   // Log start of trail and "PPR received" event. SIP_ALL_REGISTER markers will be added
@@ -2475,7 +2475,7 @@ void PushProfileTask::update_reg_data()
          it != _impus.end();
          ++it)
     {
-      log_sip_all_register_marker(*it);
+      log_sip_all_register_marker(trail(), *it);
     }
 
     Cache::PutRegData* put_reg_data =
@@ -2541,36 +2541,6 @@ void PushProfileTask::update_reg_data_failure(CassandraStore::Operation* op,
 {
   TRC_DEBUG("Failed to update registration data - report failure to HSS");
   send_ppa(DIAMETER_REQ_FAILURE);
-}
-
-void PushProfileTask::log_sip_all_register_marker(const std::string uri)
-{
-  std::string stripped_uri;
-
-  // Strip the scheme off the URI. We expect the scheme to be present, but
-  // cope with the case where it isn't.
-  stripped_uri = Utils::strip_uri_scheme(uri);
-
-  // Extract the user part from the remaining URI.
-  std::string user(stripped_uri);
-  size_t at = user.find('@');
-
-  if (at != std::string::npos)
-  {
-    user.erase(at, std::string::npos);
-  }
-
-  // Log the marker with the stripped URI as the first parameter, and the
-  // DN (if the URI can be interpreted as such) as the second parameter.
-  SAS::Marker sip_all_register(trail(), MARKER_ID_SIP_ALL_REGISTER, 1u);
-  sip_all_register.add_var_param(stripped_uri);
-
-  if (Utils::is_user_numeric(user))
-  {
-    sip_all_register.add_var_param(Utils::remove_visual_separators(user));
-  }
-
-  SAS::report_marker(sip_all_register);
 }
 
 void PushProfileTask::send_ppa(const std::string result_code)
