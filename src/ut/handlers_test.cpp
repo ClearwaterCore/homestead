@@ -1429,7 +1429,7 @@ const std::string HandlersTest::SERVER_NAME = "scscf";
 const std::string HandlersTest::IMPI = "_impi@example.com";
 const std::string HandlersTest::IMPU = "sip:impu@example.com";
 const std::string HandlersTest::IMPU2 = "sip:impu2@example.com";
-const std::string HandlersTest::IMPU3 = "sip:impu3@example.com";
+const std::string HandlersTest::IMPU3 = "sip:+44(208)3661177@example.com";
 const std::string HandlersTest::IMPU4 = "sip:impu4@example.com";
 const std::string HandlersTest::IMS_SUBSCRIPTION = "<?xml version=\"1.0\"?><IMSSubscription><PrivateID>" + IMPI + "</PrivateID><ServiceProfile><PublicIdentity><Identity>" + IMPU + "</Identity></PublicIdentity></ServiceProfile></IMSSubscription>";
 const std::string HandlersTest::REGDATA_RESULT = "<ClearwaterRegData>\n\t<RegistrationState>REGISTERED</RegistrationState>\n\t<IMSSubscription>\n\t\t<PrivateID>" + IMPI + "</PrivateID>\n\t\t<ServiceProfile>\n\t\t\t<PublicIdentity>\n\t\t\t\t<Identity>" + IMPU + "</Identity>\n\t\t\t</PublicIdentity>\n\t\t\t<PublicIdentity>\n\t\t\t\t<Identity>" + IMPU4 + "</Identity>\n\t\t\t</PublicIdentity>\n\t\t</ServiceProfile>\n\t</IMSSubscription>\n</ClearwaterRegData>\n\n";

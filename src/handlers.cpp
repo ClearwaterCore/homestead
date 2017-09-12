@@ -145,6 +145,36 @@ static void sas_log_get_reg_data_success(Cache::GetRegData* get_reg_data, SAS::T
   SAS::report_event(event);
 }
 
+void log_sip_all_register_marker(SAS::TrailId trail, const std::string uri)
+{
+  std::string stripped_uri;
+
+  // Strip the scheme off the URI. We expect the scheme to be present, but
+  // cope with the case where it isn't.
+  stripped_uri = Utils::strip_uri_scheme(uri);
+
+  // Extract the user part from the remaining URI.
+  std::string user(stripped_uri);
+  size_t at = user.find('@');
+
+  if (at != std::string::npos)
+  {
+    user.erase(at, std::string::npos);
+  }
+
+  // Log the marker with the stripped URI as the first parameter, and the
+  // DN (if the URI can be interpreted as such) as the second parameter.
+  SAS::Marker sip_all_register(trail, MARKER_ID_SIP_ALL_REGISTER, 1u);
+  sip_all_register.add_var_param(stripped_uri);
+
+  if (Utils::is_user_numeric(user))
+  {
+    sip_all_register.add_var_param(Utils::remove_visual_separators(user));
+  }
+
+  SAS::report_marker(sip_all_register);
+}
+
 // General IMPI handling.
 
 void ImpiTask::run()
@@ -1979,6 +2009,11 @@ void RegistrationTerminationTask::run()
   TRC_INFO("Received Registration-Termination request with dereg reason %d",
            _deregistration_reason);
 
+  // Log start of trail and "RTR received" event. SIP_ALL_REGISTER markers will be added
+  // for each IMPU once we have determined the list of IMPUs to unregister.
+  SAS::Marker init_time(trail(), MARKER_ID_START, 1u);
+  SAS::report_marker(init_time);
+
   SAS::Event rtr_received(trail(), SASEvent::RTR_RECEIVED, 0);
   rtr_received.add_var_param(impi);
   rtr_received.add_static_param(associated_identities.size());
@@ -2012,7 +2047,7 @@ void RegistrationTerminationTask::run()
   }
   else
   {
-    // This is either an invalid deregistration reason.
+    // This is an invalid deregistration reason.
     TRC_ERROR("Registration-Termination request received with invalid deregistration reason %d",
               _deregistration_reason);
     SAS::Event event(this->trail(), SASEvent::INVALID_DEREG_REASON, 0);
@@ -2164,7 +2199,12 @@ void RegistrationTerminationTask::delete_registrations()
        i != _registration_sets.end();
        i++)
   {
-    default_public_identities.push_back((*i)[0]);
+    std::string default_impu = (*i)[0];
+
+    // Log IMPUs to SAS as SIP_ALL_REGISTER markers so this RTR shows up in search results for the IMPU.
+    log_sip_all_register_marker(trail(), default_impu);
+
+    default_public_identities.push_back(default_impu);
   }
 
   // We need to notify sprout of the deregistrations. What we send to sprout depends
@@ -2320,6 +2360,10 @@ void RegistrationTerminationTask::send_rta(const std::string result_code)
 
 void PushProfileTask::run()
 {
+  // Log start of trail and "PPR received" event. SIP_ALL_REGISTER markers will be added
+  // for each IMPU once we have determined the list of IMPUs affected by the PPR.
+  SAS::Marker init_time(trail(), MARKER_ID_START, 1u);
+  SAS::report_marker(init_time);
   SAS::Event ppr_received(trail(), SASEvent::PPR_RECEIVED, 0);
   SAS::report_event(ppr_received);
 
@@ -2370,6 +2414,7 @@ void PushProfileTask::on_get_impus_success(CassandraStore::Operation* op)
                 impus_str.c_str(), _impi.c_str());
       // LCOV_EXCL_STOP
     }
+
     update_reg_data();
   }
   else
@@ -2423,6 +2468,14 @@ void PushProfileTask::update_reg_data()
         event.add_compressed_param(_ims_subscription, &SASEvent::PROFILE_SERVICE_PROFILE);
         SAS::report_event(event);
       }
+    }
+
+    // Log a SIP_ALL_REGISTER marker to SAS for all IMPUs found.
+    for (std::vector<std::string>::iterator it = _impus.begin();
+         it != _impus.end();
+         ++it)
+    {
+      log_sip_all_register_marker(trail(), *it);
     }
 
     Cache::PutRegData* put_reg_data =
